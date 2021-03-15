@@ -45,7 +45,7 @@
 
 **Usage:**
 
-  cscript ans2html.vbs path_to_ansi.ans path_to_html.html [page_title]
+  `cscript ans2html.vbs path_to_ansi.ans path_to_html.html [page_title]`
 
 Probably goes without saying, but paths containing spaces must be wrapped
 in double-quotes.
