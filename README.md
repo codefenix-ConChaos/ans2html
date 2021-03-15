@@ -1,4 +1,4 @@
-Description:
+**Description:**
 
   This VBScript is for converting an ANSI file to a HTML file.  Useful for
   displaying BBS door game scores on a website.
@@ -20,8 +20,12 @@ Description:
   web browsers will default to whatever monospace font is configured,
   leading to mixed results for box and line drawing characters,
   especially on mobile browsers.
+  
+**Example output:**
+  - Legend of the Red Dragon Player Rankings: https://conchaos.synchro.net/doors/lord_1scores.html
+  - Operation Overkill Top 10: https://conchaos.synchro.net/doors/ooii-a_1scores.html
 
-Known issues:
+**Known issues:**
 
   The HTML output that results is generally very good, certainly good enough
   for me.  However, occasionally there are glitches when converting certain
@@ -39,7 +43,7 @@ Known issues:
   but it needs work to allow alternating between foreground and background
   colors.  Currently it just blinks them simultaneously.
 
-Usage:
+**Usage:**
 
   cscript ans2html.vbs path_to_ansi.ans path_to_html.html [page_title]
 
@@ -47,7 +51,7 @@ Probably goes without saying, but paths containing spaces must be wrapped
 in double-quotes.
 
 
-TODO:
+**TODO:**
 - Improve CSS blink.
 - Consider a rewrite in Javascript, which would allow cross-platform
   support in Synchronet.
