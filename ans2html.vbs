@@ -92,8 +92,8 @@ Const FONT_SIZE = "2vw" ' Set this to whatever size you like best.
 
 ' Variables         Description:
 Dim CSI             ' See: https://en.wikipedia.org/wiki/ANSI_escape_code#CSI_sequences
-Dim args			     ' Incoming arguments
-Dim fso				  ' FileSystemObject
+Dim args            ' Incoming arguments
+Dim fso             ' FileSystemObject
 Dim fAnsiSource     ' ANSI source file object
 Dim fHtmlTarget     ' HTML output file object
 Dim sourceFile      ' ANSI source filename
@@ -324,186 +324,185 @@ End If
 '! @return            The rearranged ANSI data containing only "m" sequences.
 '!
 Function RearrangeAnsiData(ansiData)
-	Const MAX_COLS = 80 ' Standard 80 column width
-	Const STARTING_ROWS = 5
-	Dim returnAnsi
-	Dim j
-	Dim charAtJ
-	Dim chrCode
-	Dim escSeq
-	Dim csiLastByte
-	Dim csiArgs
-	Dim row
-	Dim col
-	Dim rowSav
-	Dim colSav
-	Dim newEscSeq
-	Dim args
-	Dim prevCol
-	Dim prevRow
-	Dim cBuf
-	Dim rBuf
+   Const MAX_COLS = 80 ' Standard 80 column width
+   Const STARTING_ROWS = 5
+   Dim returnAnsi
+   Dim j
+   Dim charAtJ
+   Dim chrCode
+   Dim escSeq
+   Dim csiLastByte
+   Dim csiArgs
+   Dim row
+   Dim col
+   Dim rowSav
+   Dim colSav
+   Dim newEscSeq
+   Dim args
+   Dim prevCol
+   Dim prevRow
+   Dim cBuf
+   Dim rBuf
 
-	' Let's declare a two-dimensional array that will contain what's basically
-	' a screen buffer.
-	ReDim screenBuffer(MAX_COLS, STARTING_ROWS)
+   ' Let's declare a two-dimensional array that will contain what's basically
+   ' a screen buffer.
+   ReDim screenBuffer(MAX_COLS, STARTING_ROWS)
 
-	' Pre-populate the screen buffer with spaces.
-	For rBuf = 0 To UBound(screenBuffer, 2)
-		For cBuf = 1 To UBound(screenBuffer, 1)
-			'If cBuf >= MAX_COLS Then
-			'	screenBuffer(cBuf, rBuf) = vbCrLf ' Not needed anymore.
-			'Else
-				screenBuffer(cBuf, rBuf) = " "
-			'End If
-		Next
-	Next
+   ' Pre-populate the screen buffer with spaces.
+   For rBuf = 0 To UBound(screenBuffer, 2)
+      For cBuf = 1 To UBound(screenBuffer, 1)
+         'If cBuf >= MAX_COLS Then
+         '   screenBuffer(cBuf, rBuf) = vbCrLf ' Not needed anymore.
+         'Else
+            screenBuffer(cBuf, rBuf) = " "
+         'End If
+      Next
+   Next
 
-	row = 0
-	col = 1
-	newEscSeq = ""
+   row = 0
+   col = 1
+   newEscSeq = ""
 
-	For j = 1 To Len(ansiData)
-		charAtJ = Mid(ansiData, j, 1)
-		chrCode = Asc(charAtJ)
+   For j = 1 To Len(ansiData)
+      charAtJ = Mid(ansiData, j, 1)
+      chrCode = Asc(charAtJ)
 
-		If Mid(ansiData, j, 2) = CSI Then
+      If Mid(ansiData, j, 2) = CSI Then
 
-			' Locate the next alpha after this point
-			escSeq = Mid(ansiData, j, InStrNextAlpha(j, ansiData, csiLastByte) - j)
-			csiArgs = Mid(escSeq, 3)
+         ' Locate the next alpha after this point
+         escSeq = Mid(ansiData, j, InStrNextAlpha(j, ansiData, csiLastByte) - j)
+         csiArgs = Mid(escSeq, 3)
 
-			' Advance the parser.
-			j = j + Len(escSeq)
+         ' Advance the parser.
+         j = j + Len(escSeq)
 
-			Select Case csiLastByte
+         Select Case csiLastByte
 
-				Case "H" ' Cursor position
-					IF InStr(csiArgs, ";") > 0 Then
-						args = Split(csiArgs, ";")
-						row = CInt(args(0)) ' n
-						col = 1
-						If Ubound(args) > 0 Then
-							col = CInt(args(1)) ' m
-						End If
-					ElseIf csiArgs <> "" Then
-						row = CInt(csiArgs) ' n
-						col = 1
-					Else
-						row = 1 ' Default to 1 if no arguments
-						col = 1
-					End If
-				Case "f" ' Cursor position, same as "H"
-					IF InStr(csiArgs, ";") > 0 Then
-						args = Split(csiArgs, ";")
-						row = CInt(args(0)) ' n
-						col = 1
-						If Ubound(args) > 0 Then
-							col = CInt(args(1)) ' m
-						End If
-					ElseIf csiArgs <> "" Then
-						row = CInt(csiArgs) ' n
-						col = 1
-					Else
-						row = 1 ' Default to 1 if no arguments
-						col = 1
-					End If
-				Case "A"   ' Cursor Up
-					If csiArgs = "" Then
-						csiArgs = 1 ' Default to 1 if no arguments
-					End If
+            Case "H" ' Cursor position
+               IF InStr(csiArgs, ";") > 0 Then
+                  args = Split(csiArgs, ";")
+                  row = CInt(args(0)) ' n
+                  col = 1
+                  If Ubound(args) > 0 Then
+                     col = CInt(args(1)) ' m
+                  End If
+               ElseIf csiArgs <> "" Then
+                  row = CInt(csiArgs) ' n
+                  col = 1
+               Else
+                  row = 1 ' Default to 1 if no arguments
+                  col = 1
+               End If
+            Case "f" ' Cursor position, same as "H"
+               IF InStr(csiArgs, ";") > 0 Then
+                  args = Split(csiArgs, ";")
+                  row = CInt(args(0)) ' n
+                  col = 1
+                  If Ubound(args) > 0 Then
+                     col = CInt(args(1)) ' m
+                  End If
+               ElseIf csiArgs <> "" Then
+                  row = CInt(csiArgs) ' n
+                  col = 1
+               Else
+                  row = 1 ' Default to 1 if no arguments
+                  col = 1
+               End If
+            Case "A"   ' Cursor Up
+               If csiArgs = "" Then
+                  csiArgs = 1 ' Default to 1 if no arguments
+               End If
                row = row - CInt(csiArgs)
-				Case "B"   ' Cursor Down
-					If csiArgs = "" Then
-						csiArgs = 1 ' Default to 1 if no arguments
-					End If
-					row = row + CInt(csiArgs)
-				Case "C"   ' Cursor Forward
-					' There is apparently an undocumented but implied cancellation of the last
-					' SGR sequence (m) whenever the "cursor" moves FORWARD, therefore we're appending
-					' said cancellation explicitly immediately before the "C" cursor movement.
-					If prevCol <= MAX_COLS And row <= UBound(screenBuffer, 2) Then
-						screenBuffer(prevCol, row) = screenBuffer(prevCol , row) & CSI & "40m"
-					End If
-					If csiArgs = "" Then
-						csiArgs = 1 ' Default to 1 if no arguments
-					End If
-					col = col + CInt(csiArgs)
-				Case "D"   ' Cursor Backward
-					If csiArgs = "" Then
-						csiArgs = 1 ' Default to 1 if no arguments
-					End If
-					col = col - CInt(csiArgs)
-				Case "s"   ' Save cursor position
-					rowSav = CInt(row)
-					colSav = CInt(col)
-				Case "u"   ' Restore cursor position
-					row = CInt(rowSav)
-					col = CInt(colSav)
-				'Case "2J"  ' Erase display (?)
-				'Case "K"   ' Erase line (?) -- Problematic..?
-				'	Wscript.echo "Clearing row " & row
-				'	Dim k
-				'	If Ubound(screenBuffer, 2) > 1 Then
-				'		For k = 1 to Ubound(screenBuffer, 2)
-				'			Wscript.echo "k " & k
-				'			screenBuffer(k, row) = ""
-				'		Next
-				'	End If
-				'Case "h"   ' Set mode (screen width/height). Probably won't bother implementing.
-				'Case "l"   ' Reset mode
-				'Case "p"   ' Set keyboard strings (most likely won't be implemented)
-				Case Else ' Store the escape sequence to travel with the next characters
-					newEscSeq = escSeq & csiLastByte
+            Case "B"   ' Cursor Down
+               If csiArgs = "" Then
+                  csiArgs = 1 ' Default to 1 if no arguments
+               End If
+               row = row + CInt(csiArgs)
+            Case "C"   ' Cursor Forward
+               ' There is apparently an undocumented but implied cancellation of the last
+               ' SGR sequence (m) whenever the "cursor" moves FORWARD, therefore we're appending
+               ' said cancellation explicitly immediately before the "C" cursor movement.
+               If prevCol <= MAX_COLS And row <= UBound(screenBuffer, 2) Then
+                  screenBuffer(prevCol, row) = screenBuffer(prevCol , row) & CSI & "40m"
+               End If
+               If csiArgs = "" Then
+                  csiArgs = 1 ' Default to 1 if no arguments
+               End If
+               col = col + CInt(csiArgs)
+            Case "D"   ' Cursor Backward
+               If csiArgs = "" Then
+                  csiArgs = 1 ' Default to 1 if no arguments
+               End If
+               col = col - CInt(csiArgs)
+            Case "s"   ' Save cursor position
+               rowSav = CInt(row)
+               colSav = CInt(col)
+            Case "u"   ' Restore cursor position
+               row = CInt(rowSav)
+               col = CInt(colSav)
+            'Case "2J"  ' Erase display (?)
+            'Case "K"   ' Erase line (?) -- Problematic..?
+            '   Wscript.echo "Clearing row " & row
+            '   Dim k
+            '   If Ubound(screenBuffer, 2) > 1 Then
+            '      For k = 1 to Ubound(screenBuffer, 2)
+            '         Wscript.echo "k " & k
+            '         screenBuffer(k, row) = ""
+            '      Next
+            '   End If
+            'Case "h"   ' Set mode (screen width/height). Probably won't bother implementing.
+            'Case "l"   ' Reset mode
+            'Case "p"   ' Set keyboard strings (most likely won't be implemented)
+            Case Else ' Store the escape sequence to travel with the next characters
+               newEscSeq = escSeq & csiLastByte
                
                'wscript.echo "(row: " & row & ", col: " & col & ") escSeq: " & escSeq
 
-			End Select
+         End Select
 
-			If row < 1 Then
-				row = 1
-			End If
-			If col < 1 Then
-				col = 1
-			End If
+         If row < 1 Then
+            row = 1
+         End If
+         If col < 1 Then
+            col = 1
+         End If
          
 
-		Else
+      Else
 
-			' Store the previous row and column before incrementing them.
-			prevRow = row
-			prevCol = col ' Not needed?
+         ' Store the previous row and column before incrementing them.
+         prevRow = row
+         prevCol = col ' Not needed?
          
-         'wscript.echo "(row: " & row & ", col: " & col & ") charAtJ: " & charAtJ
 
-			If chrCode = 13 Then
-				row = row + 1
-				col = 1
-				If j + 1 <= Len(ansiData) Then
-					If Asc(Mid(ansiData, j + 1, 1)) = 10 Then
-						j = j + 1 ' Advance the parser past the LF.
-					End If
-				End If
+         If chrCode = 13 Then
+            row = row + 1
+            col = 1
+            If j + 1 <= Len(ansiData) Then
+               If Asc(Mid(ansiData, j + 1, 1)) = 10 Then
+                  j = j + 1 ' Advance the parser past the LF.
+               End If
+            End If
          ElseIf charCode = 10 Then
             row = row + 1
             col = 1
-			Else
-				' Append a line if it goes beyond the current max.
-				If row > UBound(screenBuffer, 2) Then
-					ReDim Preserve screenBuffer(MAX_COLS, row)
+         Else
+            ' Append a line if it goes beyond the current max.
+            If row > UBound(screenBuffer, 2) Then
+               ReDim Preserve screenBuffer(MAX_COLS, row)
 
-					' Initialize the new row with all blanks/CR-LFs.
-					For cBuf = 1 To UBound(screenBuffer, 1)
-						'If cBuf >= MAX_COLS Then
-						'	screenBuffer(cBuf, row) = vbCrLf ' Not needed.
-						'Else
+               ' Initialize the new row with all blanks/CR-LFs.
+               For cBuf = 1 To UBound(screenBuffer, 1)
+                  'If cBuf >= MAX_COLS Then
+                  '   screenBuffer(cBuf, row) = vbCrLf ' Not needed.
+                  'Else
                   'If cBuf <= 1 Then
-						'	screenBuffer(cBuf, row) = CSI & "40m "
-						'Else
-							screenBuffer(cBuf, row) = " "
-						'End If
-					Next
-				End If
+                  '   screenBuffer(cBuf, row) = CSI & "40m "
+                  'Else
+                     screenBuffer(cBuf, row) = " "
+                  'End If
+               Next
+            End If
 
             ' TODO...
             ' - Find a way to preserve CSI codes when re-entering a cell...
@@ -513,29 +512,29 @@ Function RearrangeAnsiData(ansiData)
             '   wscript.echo "Replacing with {" & newEscSeq & charAtJ & "}"
             'end if
 
-				screenBuffer(col, row) = newEscSeq & charAtJ
-				col = col + 1
-				' Clear the newEscSeq after using it, don't need it again.
-				If newEscSeq <> "" Then
-					newEscSeq = ""
-				End If
-				' Reached the end of the screen.
-				If col > MAX_COLS Then
-					col = 1
-					row = row + 1
-				End If
-			End If
-		End if
-	Next
+            screenBuffer(col, row) = newEscSeq & charAtJ
+            col = col + 1
+            ' Clear the newEscSeq after using it, don't need it again.
+            If newEscSeq <> "" Then
+               newEscSeq = ""
+            End If
+            ' Reached the end of the screen.
+            If col > MAX_COLS Then
+               col = 1
+               row = row + 1
+            End If
+         End If
+      End if
+   Next
 
-	' Now form new ansiData out of the screen buffer contents.
-	For rBuf = 0 To UBound(screenBuffer, 2)
-		For cBuf = 1 To UBound(screenBuffer, 1)
-			returnAnsi = returnAnsi & screenBuffer(cBuf, rBuf)
-		Next
-	Next
+   ' Now form new ansiData out of the screen buffer contents.
+   For rBuf = 0 To UBound(screenBuffer, 2)
+      For cBuf = 1 To UBound(screenBuffer, 1)
+         returnAnsi = returnAnsi & screenBuffer(cBuf, rBuf)
+      Next
+   Next
 
-	RearrangeAnsiData = returnAnsi
+   RearrangeAnsiData = returnAnsi
 End Function
 
 '! Searches a string for the position of the next alpha character.
@@ -546,21 +545,21 @@ End Function
 '! @return                 The index of the alpha character found.
 '!
 Function InStrNextAlpha(startIndex, stringToSearch, ByRef alphaFound)
-	Dim j
-	Dim thisAsc
-	Dim returnIndex
-	Dim cha
-	alphaFound = ""
-	For j = startIndex To Len(stringToSearch)
-		cha = Mid(stringToSearch, j, 1)
-		thisAsc = Asc(cha)
-		If ((thisAsc >= 65 And thisAsc <= 90) Or (thisAsc >= 97 And thisAsc <= 122)) and alphaFound = "" Then
-			returnIndex = j
-			alphaFound = cha
-			Exit For
-		End If
-	Next
-	InStrNextAlpha = returnIndex
+   Dim j
+   Dim thisAsc
+   Dim returnIndex
+   Dim cha
+   alphaFound = ""
+   For j = startIndex To Len(stringToSearch)
+      cha = Mid(stringToSearch, j, 1)
+      thisAsc = Asc(cha)
+      If ((thisAsc >= 65 And thisAsc <= 90) Or (thisAsc >= 97 And thisAsc <= 122)) and alphaFound = "" Then
+         returnIndex = j
+         alphaFound = cha
+         Exit For
+      End If
+   Next
+   InStrNextAlpha = returnIndex
 End Function
 
 '! Determines whether to intensify a hex color value.
@@ -572,30 +571,30 @@ End Function
 '! @return            Hex value for either the normal or intensified color.
 '!
 Function SetColorIntensity(color, intensity)
-	If intensity = 1 Then
-		Select Case color
-			Case BLACK
-				SetColorIntensity = DARKGRAY
-			Case RED
-				SetColorIntensity = LIGHTRED
-			Case GREEN
-				SetColorIntensity = LIGHTGREEN
-			Case BROWN
-				SetColorIntensity = YELLOW
-			Case BLUE
-				SetColorIntensity = LIGHTBLUE
-			Case MAGENTA
-				SetColorIntensity = LIGHTMAGENTA
-			Case CYAN
-				SetColorIntensity = LIGHTCYAN
-			Case GRAY
-				SetColorIntensity = WHITE
-			Case Else
-				SetColorIntensity = color
-		End Select
-	Else
-		SetColorIntensity = color
-	End If
+   If intensity = 1 Then
+      Select Case color
+         Case BLACK
+            SetColorIntensity = DARKGRAY
+         Case RED
+            SetColorIntensity = LIGHTRED
+         Case GREEN
+            SetColorIntensity = LIGHTGREEN
+         Case BROWN
+            SetColorIntensity = YELLOW
+         Case BLUE
+            SetColorIntensity = LIGHTBLUE
+         Case MAGENTA
+            SetColorIntensity = LIGHTMAGENTA
+         Case CYAN
+            SetColorIntensity = LIGHTCYAN
+         Case GRAY
+            SetColorIntensity = WHITE
+         Case Else
+            SetColorIntensity = color
+      End Select
+   Else
+      SetColorIntensity = color
+   End If
 End Function
 
 '! Translates an ANSI character value from code page 437 to its modern HTML
@@ -607,336 +606,336 @@ End Function
 '!
 '! @see https://en.wikipedia.org/wiki/Code_page_437
 Function ToHtmlEntity(ansiCharCode)
-	Select Case ansiCharCode
-		Case 1
-			ToHtmlEntity = "&#x263A;" ' Smiley
-		Case 2
-			ToHtmlEntity = "&#x263B;" ' Inverted smiley
-		Case 3
-			ToHtmlEntity = "&#x2665;" ' Heart
-		Case 4
-			ToHtmlEntity = "&#x2666;" ' Diamond
-		Case 5
-			ToHtmlEntity = "&#x2663;" ' Club
-		Case 6
-			ToHtmlEntity = "&#x2660;" ' Spade
-		Case 7
-			ToHtmlEntity = "&#x2022;" ' Bullet
-		Case 8
-			ToHtmlEntity = "&#x25D8;" ' Inverted bullet
-		Case 9
-			ToHtmlEntity = "&#x25CB;" ' Circle
-		Case 10
-			' Also a line feed.
-			ToHtmlEntity = "&#x25D9;" ' Inverted circle
-		Case 11
-			ToHtmlEntity = "&#x2642;" ' Male
-		Case 12
-			ToHtmlEntity = "&#x2640;" ' Female
-		Case 13
-			' Also a carriage return.
-			ToHtmlEntity = "&#x266A;" ' Eighth note
-		Case 14
-			ToHtmlEntity = "&#x266B;" ' Beamed eighth note
-		Case 15
-			ToHtmlEntity = "&#x263C;" ' Solar
-		Case 16
-			ToHtmlEntity = "&#x25BA;" ' Right triangle
-		Case 17
-			ToHtmlEntity = "&#x25C0;" ' Left triangle
-		Case 18
-			ToHtmlEntity = "&#x2195;" ' Up and down arrow
-		Case 19
-			ToHtmlEntity = "&#x203C;" ' Double bang
-		Case 20
-			ToHtmlEntity = "&#x00B6;" ' Paragraph
-		Case 21
-			ToHtmlEntity = "&#x00A7;" ' Section
-		Case 22
-			ToHtmlEntity = "&#x25AC;" ' Horizontal line
-		Case 23
-			ToHtmlEntity = "&#x21A8;" ' Up and down arrow with underscore
-		Case 24
-			ToHtmlEntity = "&#x2191;" ' Up arrow
-		Case 25
-			ToHtmlEntity = "&#x2193;" ' Down arrow
-		Case 26
-			ToHtmlEntity = "&#x2192;" ' Right arrow
-		Case 27
-			ToHtmlEntity = "&#x2190;" ' Left arrow
-		Case 28
-			ToHtmlEntity = "&#x221F;" ' Right angle
-		Case 29
-			ToHtmlEntity = "&#x2194;" ' Left and Right arrow
-		Case 30
-			ToHtmlEntity = "&#x25B2;" ' Up triangle
-		Case 31
-			ToHtmlEntity = "&#x25BC;" ' Down triangle
-		Case 127
-			ToHtmlEntity = "&#x2302;" ' House
-		Case 128
-			ToHtmlEntity = "&#x00C7;" ' Latin letter cedilla
-		Case 129
-			ToHtmlEntity = "&#x00FC;" ' u-umlaut
-		Case 130
-			ToHtmlEntity = "&#x00E9;" ' e-acute
-		Case 131
-			ToHtmlEntity = "&#x00E2;" ' a-circumflex
-		Case 132
-			ToHtmlEntity = "&#x00E4;" ' a-umlaut
-		Case 133
-			ToHtmlEntity = "&#x00E0;" ' a-grave
-		Case 134
-			ToHtmlEntity = "&#x00E5;" ' a-ring
-		Case 135
-			ToHtmlEntity = "&#x00E7;" ' Latin letter cedilla, lowercase
-		Case 136
-			ToHtmlEntity = "&#x00EA;" ' e-circumflex
-		Case 137
-			ToHtmlEntity = "&#x00EB;" ' e-umlaut
-		Case 138
-			ToHtmlEntity = "&#x00E8;" ' e-grave
-		Case 139
-			ToHtmlEntity = "&#x00EF;" ' i-umlaut
-		Case 140
-			ToHtmlEntity = "&#x00EE;" ' i-circumflex
-		Case 141
-			ToHtmlEntity = "&#x00EC;" ' i-grave
-		Case 142
-			ToHtmlEntity = "&#x00C4;" ' A-umlaut
-		Case 143
-			ToHtmlEntity = "&#x00C5;" ' A-ring
-		Case 144
-			ToHtmlEntity = "&#x00C9;" ' E-acute
-		Case 145
-			ToHtmlEntity = "&#x00E6;" ' lowercase aesc
-		Case 146
-			ToHtmlEntity = "&#x00C6;" ' uppercase AEsc
-		Case 147
-			ToHtmlEntity = "&#x00F4;" ' o-circumflex
-		Case 148
-			ToHtmlEntity = "&#x00F6;" ' o-umlaut
-		Case 149
-			ToHtmlEntity = "&#x00F2;" ' o-grave
-		Case 150
-			ToHtmlEntity = "&#x00FB;" ' u-circumflex
-		Case 151
-			ToHtmlEntity = "&#x00F9;" ' u-grave
-		Case 152
-			ToHtmlEntity = "&#x00FF;" ' y-umlaut
-		Case 153
-			ToHtmlEntity = "&#x00D6;" ' O-umlaut
-		Case 154
-			ToHtmlEntity = "&#x00DC;" ' U-umlaut
-		Case 155
-			ToHtmlEntity = "&#x00A2;" ' cents
-		Case 156
-			ToHtmlEntity = "&#x00A3;" ' British pound
-		Case 157
-			ToHtmlEntity = "&#x00A5;" ' yen
-		Case 158
-			ToHtmlEntity = "&#x20A7;" ' peseta
-		Case 159
-			ToHtmlEntity = "&#x0192;" ' f with hook
-		Case 160
-			ToHtmlEntity = "&#x00E1;" ' a-acute
-		Case 161
-			ToHtmlEntity = "&#x00ED;" ' i-acute
-		Case 162
-			ToHtmlEntity = "&#x00F3;" ' o-acute
-		Case 163
-			ToHtmlEntity = "&#x00FA;" ' u-acute
-		Case 164
-			ToHtmlEntity = "&#x00F1;" ' Spanish n (enye)
-		Case 165
-			ToHtmlEntity = "&#x00D1;" ' Spanish N (eNye)
-		Case 166
-			ToHtmlEntity = "&#x00AA;" ' ordinal a
-		Case 167
-			ToHtmlEntity = "&#x00BA;" ' ordinal o
-		Case 168
-			ToHtmlEntity = "&#x00BF;" ' inverted ?
-		Case 169
-			ToHtmlEntity = "&#x2310;" ' negation (left)
-		Case 170
-			ToHtmlEntity = "&#x00AC;" ' negation (right)
-		Case 171
-			ToHtmlEntity = "&#x00BD;" ' 1 half
-		Case 172
-			ToHtmlEntity = "&#x00BC;" ' 1 fourth
-		Case 173
-			ToHtmlEntity = "&#x00A1;" ' inverted !
-		Case 174
-			ToHtmlEntity = "&#x00AB;" ' left guillemets
-		Case 175
-			ToHtmlEntity = "&#x00BB;" ' right guillemets
-		Case 176
-			ToHtmlEntity = "&#x2591;" ' shaded block, light
-		Case 177
-			ToHtmlEntity = "&#x2592;" ' shaded block, medium
-		Case 178
-			ToHtmlEntity = "&#x2593;" ' shaded block, dark
-		Case 179
-			ToHtmlEntity = "&#x2502;" ' thin line, vertical
-		Case 180
-			ToHtmlEntity = "&#x2524;" ' thin right intersect
-		Case 181
-			ToHtmlEntity = "&#x2561;" ' thin double right intersect
-		Case 182
-			ToHtmlEntity = "&#x2562;" ' double thin right intersect
-		Case 183
-			ToHtmlEntity = "&#x2556;" ' thin double NE corner
-		Case 184
-			ToHtmlEntity = "&#x2555;" ' double thin corner
-		Case 185
-			ToHtmlEntity = "&#x2563;" ' double right intersect
-		Case 186
-			ToHtmlEntity = "&#x2551;" ' double vertical
-		Case 187
-			ToHtmlEntity = "&#x2557;" ' double NE corner
-		Case 188
-			ToHtmlEntity = "&#x255D;" ' double SE corner
-		Case 189
-			ToHtmlEntity = "&#x255C;" ' thin double SE corner
-		Case 190
-			ToHtmlEntity = "&#x255B;" ' double thin SE corner
-		Case 191
-			ToHtmlEntity = "&#x2510;" ' thin NE corner
-		Case 192
-			ToHtmlEntity = "&#x2514;" ' thin SW corner
-		Case 193
-			ToHtmlEntity = "&#x2534;" ' thin bottom intersect
-		Case 194
-			ToHtmlEntity = "&#x252C;" ' thin top intersect
-		Case 195
-			ToHtmlEntity = "&#x251C;" ' thin left intersect
-		Case 196
-			ToHtmlEntity = "&#x2500;" ' thin line horizontal
-		Case 197
-			ToHtmlEntity = "&#x253C;" ' thin center intersect
-		Case 198
-			ToHtmlEntity = "&#x255E;" ' thin double left intersect
-		Case 199
-			ToHtmlEntity = "&#x255F;" ' double thin left intersect
-		Case 200
-			ToHtmlEntity = "&#x255A;" ' double SW corner
-		Case 201
-			ToHtmlEntity = "&#x2554;" ' double NW corner
-		Case 202
-			ToHtmlEntity = "&#x2569;" ' double bottom intersect
-		Case 203
-			ToHtmlEntity = "&#x2566;" ' double top intersect
-		Case 204
-			ToHtmlEntity = "&#x2560;" ' double left intersect
-		Case 205
-			ToHtmlEntity = "&#x2550;" ' double line horizontal
-		Case 206
-			ToHtmlEntity = "&#x256C;" ' double center intersect
-		Case 207
-			ToHtmlEntity = "&#x2567;" ' thin double bottom intersect
-		Case 208
-			ToHtmlEntity = "&#x2568;" ' double thin bottom intersect
-		Case 209
-			ToHtmlEntity = "&#x2564;" ' double thin top intersect
-		Case 210
-			ToHtmlEntity = "&#x2565;" ' thin double top intersect
-		Case 211
-			ToHtmlEntity = "&#x2559;" ' double thin SW corner
-		Case 212
-			ToHtmlEntity = "&#x2558;" ' thin double SW corner
-		Case 213
-			ToHtmlEntity = "&#x2552;" ' thin double NW corner
-		Case 214
-			ToHtmlEntity = "&#x2553;" ' double thin NW corner
-		Case 215
-			ToHtmlEntity = "&#x256B;" ' thin double center intersect
-		Case 216
-			ToHtmlEntity = "&#x256A;" ' double thin center intersect
-		Case 217
-			ToHtmlEntity = "&#x2518;" ' thin SE corner
-		Case 218
-			ToHtmlEntity = "&#x250C;" ' thin NW corner
-		Case 219
-			ToHtmlEntity = "&#x2588;" ' solid block
-		Case 220
-			ToHtmlEntity = "&#x2584;" ' bottom half block
-		Case 221
-			ToHtmlEntity = "&#x258C;" ' left half block
-		Case 222
-			ToHtmlEntity = "&#x2590;" ' right half block
-		Case 223
-			ToHtmlEntity = "&#x2580;" ' top half block
-		Case 224
-			ToHtmlEntity = "&#x03B1;" ' alpha
-		Case 225
-			'ToHtmlEntity = "&#x03B2;" ' Beta
-			ToHtmlEntity = "&#x00DF;" ' Eszett
-		Case 226
-			ToHtmlEntity = "&#x0393;" ' gamma
-		Case 227
-			ToHtmlEntity = "&#x03C0;" ' pi
-		Case 228
-			ToHtmlEntity = "&#x03A3;" ' sigma uppercase
-		Case 229
-			ToHtmlEntity = "&#x03C3;" ' sigma lowercase
-		Case 230
-			'ToHtmlEntity = "&#x03BC;"
-			ToHtmlEntity = "&#x00B5;" ' mu
-		Case 231
-			ToHtmlEntity = "&#x03C4;" ' tau
-		Case 232
-			'ToHtmlEntity = "&#x0424;"
-			ToHtmlEntity = "&#x03A6;" ' phi
-		Case 233
-			ToHtmlEntity = "&#x0398;" ' theta
-		Case 234
-			ToHtmlEntity = "&#x03A9;" ' Omega
-		Case 235
-			ToHtmlEntity = "&#x03B4;" ' Delta
-		Case 236
-			ToHtmlEntity = "&#x221E;" ' infinity
-		Case 237
-			'ToHtmlEntity = "&#x0444;"
-			ToHtmlEntity = "&#x03C6;" ' Phi
-		Case 238
-			'ToHtmlEntity = "&#x0152;"
-			ToHtmlEntity = "&#x03B5;" ' Epsilon
-		Case 239
-			'ToHtmlEntity = "&#x22C2;"
-			ToHtmlEntity = "&#x2229;" ' intersection
-		Case 240
-			ToHtmlEntity = "&#x2261;" ' triple bar
-		Case 241
-			'ToHtmlEntity = "&#x2213;"
-			ToHtmlEntity = "&#x00B1;" ' plus minus
-		Case 242
-			ToHtmlEntity = "&#x2265;" ' greater or equal to
-		Case 243
-			ToHtmlEntity = "&#x2264;" ' less or equal to
-		Case 244
-			'ToHtmlEntity = "&#x256D;"
-			ToHtmlEntity = "&#x2320;" ' top integral
-		Case 245
-			'ToHtmlEntity = "&#x256F;"
-			ToHtmlEntity = "&#x2321;" ' bottom integral
-		Case 246
-			ToHtmlEntity = "&#x00F7;" ' obelus (division)
-		Case 247
-			ToHtmlEntity = "&#x2248;" ' approximation
-		Case 248
-			ToHtmlEntity = "&#x00B0;" ' degree
-		Case 249
-			'ToHtmlEntity = "&#x2022;"
-			ToHtmlEntity = "&#x2219;" ' bullet
-		Case 250
-			ToHtmlEntity = "&#x00B7;" ' interpunct
-		Case 251
-			ToHtmlEntity = "&#x221A;" ' square root / check mark
-		Case 252
-			ToHtmlEntity = "&#x207F;" ' ordinal n
-		Case 253
-			ToHtmlEntity = "&#x00B2;" ' squared (raised 2)
-		Case 254
-			ToHtmlEntity = "&#x25A0;" ' small block
-	End Select
+   Select Case ansiCharCode
+      Case 1
+         ToHtmlEntity = "&#x263A;" ' Smiley
+      Case 2
+         ToHtmlEntity = "&#x263B;" ' Inverted smiley
+      Case 3
+         ToHtmlEntity = "&#x2665;" ' Heart
+      Case 4
+         ToHtmlEntity = "&#x2666;" ' Diamond
+      Case 5
+         ToHtmlEntity = "&#x2663;" ' Club
+      Case 6
+         ToHtmlEntity = "&#x2660;" ' Spade
+      Case 7
+         ToHtmlEntity = "&#x2022;" ' Bullet
+      Case 8
+         ToHtmlEntity = "&#x25D8;" ' Inverted bullet
+      Case 9
+         ToHtmlEntity = "&#x25CB;" ' Circle
+      Case 10
+         ' Also a line feed.
+         ToHtmlEntity = "&#x25D9;" ' Inverted circle
+      Case 11
+         ToHtmlEntity = "&#x2642;" ' Male
+      Case 12
+         ToHtmlEntity = "&#x2640;" ' Female
+      Case 13
+         ' Also a carriage return.
+         ToHtmlEntity = "&#x266A;" ' Eighth note
+      Case 14
+         ToHtmlEntity = "&#x266B;" ' Beamed eighth note
+      Case 15
+         ToHtmlEntity = "&#x263C;" ' Solar
+      Case 16
+         ToHtmlEntity = "&#x25BA;" ' Right triangle
+      Case 17
+         ToHtmlEntity = "&#x25C0;" ' Left triangle
+      Case 18
+         ToHtmlEntity = "&#x2195;" ' Up and down arrow
+      Case 19
+         ToHtmlEntity = "&#x203C;" ' Double bang
+      Case 20
+         ToHtmlEntity = "&#x00B6;" ' Paragraph
+      Case 21
+         ToHtmlEntity = "&#x00A7;" ' Section
+      Case 22
+         ToHtmlEntity = "&#x25AC;" ' Horizontal line
+      Case 23
+         ToHtmlEntity = "&#x21A8;" ' Up and down arrow with underscore
+      Case 24
+         ToHtmlEntity = "&#x2191;" ' Up arrow
+      Case 25
+         ToHtmlEntity = "&#x2193;" ' Down arrow
+      Case 26
+         ToHtmlEntity = "&#x2192;" ' Right arrow
+      Case 27
+         ToHtmlEntity = "&#x2190;" ' Left arrow
+      Case 28
+         ToHtmlEntity = "&#x221F;" ' Right angle
+      Case 29
+         ToHtmlEntity = "&#x2194;" ' Left and Right arrow
+      Case 30
+         ToHtmlEntity = "&#x25B2;" ' Up triangle
+      Case 31
+         ToHtmlEntity = "&#x25BC;" ' Down triangle
+      Case 127
+         ToHtmlEntity = "&#x2302;" ' House
+      Case 128
+         ToHtmlEntity = "&#x00C7;" ' Latin letter cedilla
+      Case 129
+         ToHtmlEntity = "&#x00FC;" ' u-umlaut
+      Case 130
+         ToHtmlEntity = "&#x00E9;" ' e-acute
+      Case 131
+         ToHtmlEntity = "&#x00E2;" ' a-circumflex
+      Case 132
+         ToHtmlEntity = "&#x00E4;" ' a-umlaut
+      Case 133
+         ToHtmlEntity = "&#x00E0;" ' a-grave
+      Case 134
+         ToHtmlEntity = "&#x00E5;" ' a-ring
+      Case 135
+         ToHtmlEntity = "&#x00E7;" ' Latin letter cedilla, lowercase
+      Case 136
+         ToHtmlEntity = "&#x00EA;" ' e-circumflex
+      Case 137
+         ToHtmlEntity = "&#x00EB;" ' e-umlaut
+      Case 138
+         ToHtmlEntity = "&#x00E8;" ' e-grave
+      Case 139
+         ToHtmlEntity = "&#x00EF;" ' i-umlaut
+      Case 140
+         ToHtmlEntity = "&#x00EE;" ' i-circumflex
+      Case 141
+         ToHtmlEntity = "&#x00EC;" ' i-grave
+      Case 142
+         ToHtmlEntity = "&#x00C4;" ' A-umlaut
+      Case 143
+         ToHtmlEntity = "&#x00C5;" ' A-ring
+      Case 144
+         ToHtmlEntity = "&#x00C9;" ' E-acute
+      Case 145
+         ToHtmlEntity = "&#x00E6;" ' lowercase aesc
+      Case 146
+         ToHtmlEntity = "&#x00C6;" ' uppercase AEsc
+      Case 147
+         ToHtmlEntity = "&#x00F4;" ' o-circumflex
+      Case 148
+         ToHtmlEntity = "&#x00F6;" ' o-umlaut
+      Case 149
+         ToHtmlEntity = "&#x00F2;" ' o-grave
+      Case 150
+         ToHtmlEntity = "&#x00FB;" ' u-circumflex
+      Case 151
+         ToHtmlEntity = "&#x00F9;" ' u-grave
+      Case 152
+         ToHtmlEntity = "&#x00FF;" ' y-umlaut
+      Case 153
+         ToHtmlEntity = "&#x00D6;" ' O-umlaut
+      Case 154
+         ToHtmlEntity = "&#x00DC;" ' U-umlaut
+      Case 155
+         ToHtmlEntity = "&#x00A2;" ' cents
+      Case 156
+         ToHtmlEntity = "&#x00A3;" ' British pound
+      Case 157
+         ToHtmlEntity = "&#x00A5;" ' yen
+      Case 158
+         ToHtmlEntity = "&#x20A7;" ' peseta
+      Case 159
+         ToHtmlEntity = "&#x0192;" ' f with hook
+      Case 160
+         ToHtmlEntity = "&#x00E1;" ' a-acute
+      Case 161
+         ToHtmlEntity = "&#x00ED;" ' i-acute
+      Case 162
+         ToHtmlEntity = "&#x00F3;" ' o-acute
+      Case 163
+         ToHtmlEntity = "&#x00FA;" ' u-acute
+      Case 164
+         ToHtmlEntity = "&#x00F1;" ' Spanish n (enye)
+      Case 165
+         ToHtmlEntity = "&#x00D1;" ' Spanish N (eNye)
+      Case 166
+         ToHtmlEntity = "&#x00AA;" ' ordinal a
+      Case 167
+         ToHtmlEntity = "&#x00BA;" ' ordinal o
+      Case 168
+         ToHtmlEntity = "&#x00BF;" ' inverted ?
+      Case 169
+         ToHtmlEntity = "&#x2310;" ' negation (left)
+      Case 170
+         ToHtmlEntity = "&#x00AC;" ' negation (right)
+      Case 171
+         ToHtmlEntity = "&#x00BD;" ' 1 half
+      Case 172
+         ToHtmlEntity = "&#x00BC;" ' 1 fourth
+      Case 173
+         ToHtmlEntity = "&#x00A1;" ' inverted !
+      Case 174
+         ToHtmlEntity = "&#x00AB;" ' left guillemets
+      Case 175
+         ToHtmlEntity = "&#x00BB;" ' right guillemets
+      Case 176
+         ToHtmlEntity = "&#x2591;" ' shaded block, light
+      Case 177
+         ToHtmlEntity = "&#x2592;" ' shaded block, medium
+      Case 178
+         ToHtmlEntity = "&#x2593;" ' shaded block, dark
+      Case 179
+         ToHtmlEntity = "&#x2502;" ' thin line, vertical
+      Case 180
+         ToHtmlEntity = "&#x2524;" ' thin right intersect
+      Case 181
+         ToHtmlEntity = "&#x2561;" ' thin double right intersect
+      Case 182
+         ToHtmlEntity = "&#x2562;" ' double thin right intersect
+      Case 183
+         ToHtmlEntity = "&#x2556;" ' thin double NE corner
+      Case 184
+         ToHtmlEntity = "&#x2555;" ' double thin corner
+      Case 185
+         ToHtmlEntity = "&#x2563;" ' double right intersect
+      Case 186
+         ToHtmlEntity = "&#x2551;" ' double vertical
+      Case 187
+         ToHtmlEntity = "&#x2557;" ' double NE corner
+      Case 188
+         ToHtmlEntity = "&#x255D;" ' double SE corner
+      Case 189
+         ToHtmlEntity = "&#x255C;" ' thin double SE corner
+      Case 190
+         ToHtmlEntity = "&#x255B;" ' double thin SE corner
+      Case 191
+         ToHtmlEntity = "&#x2510;" ' thin NE corner
+      Case 192
+         ToHtmlEntity = "&#x2514;" ' thin SW corner
+      Case 193
+         ToHtmlEntity = "&#x2534;" ' thin bottom intersect
+      Case 194
+         ToHtmlEntity = "&#x252C;" ' thin top intersect
+      Case 195
+         ToHtmlEntity = "&#x251C;" ' thin left intersect
+      Case 196
+         ToHtmlEntity = "&#x2500;" ' thin line horizontal
+      Case 197
+         ToHtmlEntity = "&#x253C;" ' thin center intersect
+      Case 198
+         ToHtmlEntity = "&#x255E;" ' thin double left intersect
+      Case 199
+         ToHtmlEntity = "&#x255F;" ' double thin left intersect
+      Case 200
+         ToHtmlEntity = "&#x255A;" ' double SW corner
+      Case 201
+         ToHtmlEntity = "&#x2554;" ' double NW corner
+      Case 202
+         ToHtmlEntity = "&#x2569;" ' double bottom intersect
+      Case 203
+         ToHtmlEntity = "&#x2566;" ' double top intersect
+      Case 204
+         ToHtmlEntity = "&#x2560;" ' double left intersect
+      Case 205
+         ToHtmlEntity = "&#x2550;" ' double line horizontal
+      Case 206
+         ToHtmlEntity = "&#x256C;" ' double center intersect
+      Case 207
+         ToHtmlEntity = "&#x2567;" ' thin double bottom intersect
+      Case 208
+         ToHtmlEntity = "&#x2568;" ' double thin bottom intersect
+      Case 209
+         ToHtmlEntity = "&#x2564;" ' double thin top intersect
+      Case 210
+         ToHtmlEntity = "&#x2565;" ' thin double top intersect
+      Case 211
+         ToHtmlEntity = "&#x2559;" ' double thin SW corner
+      Case 212
+         ToHtmlEntity = "&#x2558;" ' thin double SW corner
+      Case 213
+         ToHtmlEntity = "&#x2552;" ' thin double NW corner
+      Case 214
+         ToHtmlEntity = "&#x2553;" ' double thin NW corner
+      Case 215
+         ToHtmlEntity = "&#x256B;" ' thin double center intersect
+      Case 216
+         ToHtmlEntity = "&#x256A;" ' double thin center intersect
+      Case 217
+         ToHtmlEntity = "&#x2518;" ' thin SE corner
+      Case 218
+         ToHtmlEntity = "&#x250C;" ' thin NW corner
+      Case 219
+         ToHtmlEntity = "&#x2588;" ' solid block
+      Case 220
+         ToHtmlEntity = "&#x2584;" ' bottom half block
+      Case 221
+         ToHtmlEntity = "&#x258C;" ' left half block
+      Case 222
+         ToHtmlEntity = "&#x2590;" ' right half block
+      Case 223
+         ToHtmlEntity = "&#x2580;" ' top half block
+      Case 224
+         ToHtmlEntity = "&#x03B1;" ' alpha
+      Case 225
+         'ToHtmlEntity = "&#x03B2;" ' Beta
+         ToHtmlEntity = "&#x00DF;" ' Eszett
+      Case 226
+         ToHtmlEntity = "&#x0393;" ' gamma
+      Case 227
+         ToHtmlEntity = "&#x03C0;" ' pi
+      Case 228
+         ToHtmlEntity = "&#x03A3;" ' sigma uppercase
+      Case 229
+         ToHtmlEntity = "&#x03C3;" ' sigma lowercase
+      Case 230
+         'ToHtmlEntity = "&#x03BC;"
+         ToHtmlEntity = "&#x00B5;" ' mu
+      Case 231
+         ToHtmlEntity = "&#x03C4;" ' tau
+      Case 232
+         'ToHtmlEntity = "&#x0424;"
+         ToHtmlEntity = "&#x03A6;" ' phi
+      Case 233
+         ToHtmlEntity = "&#x0398;" ' theta
+      Case 234
+         ToHtmlEntity = "&#x03A9;" ' Omega
+      Case 235
+         ToHtmlEntity = "&#x03B4;" ' Delta
+      Case 236
+         ToHtmlEntity = "&#x221E;" ' infinity
+      Case 237
+         'ToHtmlEntity = "&#x0444;"
+         ToHtmlEntity = "&#x03C6;" ' Phi
+      Case 238
+         'ToHtmlEntity = "&#x0152;"
+         ToHtmlEntity = "&#x03B5;" ' Epsilon
+      Case 239
+         'ToHtmlEntity = "&#x22C2;"
+         ToHtmlEntity = "&#x2229;" ' intersection
+      Case 240
+         ToHtmlEntity = "&#x2261;" ' triple bar
+      Case 241
+         'ToHtmlEntity = "&#x2213;"
+         ToHtmlEntity = "&#x00B1;" ' plus minus
+      Case 242
+         ToHtmlEntity = "&#x2265;" ' greater or equal to
+      Case 243
+         ToHtmlEntity = "&#x2264;" ' less or equal to
+      Case 244
+         'ToHtmlEntity = "&#x256D;"
+         ToHtmlEntity = "&#x2320;" ' top integral
+      Case 245
+         'ToHtmlEntity = "&#x256F;"
+         ToHtmlEntity = "&#x2321;" ' bottom integral
+      Case 246
+         ToHtmlEntity = "&#x00F7;" ' obelus (division)
+      Case 247
+         ToHtmlEntity = "&#x2248;" ' approximation
+      Case 248
+         ToHtmlEntity = "&#x00B0;" ' degree
+      Case 249
+         'ToHtmlEntity = "&#x2022;"
+         ToHtmlEntity = "&#x2219;" ' bullet
+      Case 250
+         ToHtmlEntity = "&#x00B7;" ' interpunct
+      Case 251
+         ToHtmlEntity = "&#x221A;" ' square root / check mark
+      Case 252
+         ToHtmlEntity = "&#x207F;" ' ordinal n
+      Case 253
+         ToHtmlEntity = "&#x00B2;" ' squared (raised 2)
+      Case 254
+         ToHtmlEntity = "&#x25A0;" ' small block
+   End Select
 End Function
