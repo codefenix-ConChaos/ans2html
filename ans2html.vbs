@@ -88,14 +88,13 @@ Const WHITE = "#FFF"
 
 ' Best font for box drawing.
 Const FONT_FAMILY = """Source Code Pro"",monospace"
-Const FONT_SIZE = "2vw" ' Set this to whatever size you like best.
+Const FONT_SIZE = "13px" ' Set this to whatever size you like best.
 
 ' Variables         Description:
 Dim CSI             ' See: https://en.wikipedia.org/wiki/ANSI_escape_code#CSI_sequences
 Dim args            ' Incoming arguments
 Dim fso             ' FileSystemObject
 Dim fAnsiSource     ' ANSI source file object
-Dim fHtmlTarget     ' HTML output file object
 Dim sourceFile      ' ANSI source filename
 Dim targetFile      ' HTML output filename
 Dim title           ' Title of HTML output file
@@ -117,8 +116,14 @@ Dim holdColor       ' Variable for holding a color if swapping
 Dim startPos        ' Reading start position. For now just 1.
 Dim colPos          ' Output column number. Used for auto-wrapping the output.
 Dim i
+Dim oStream
 
 ' Initialize
+
+Set oStream = CreateObject("ADODB.Stream")
+oStream.charSet = "ASCII"
+oStream.Open
+
 Set args = Wscript.Arguments
 sourceFile = args(0)
 targetFile = args(1)
@@ -131,19 +136,11 @@ colPos = 0
 fgIntensity = 0
 fgColor = GRAY
 bgColor = BLACK
-htmlOutput = "<!DOCTYPE html>" & vbCrlf & "<html lang='en'>" & vbCrlf & _
-   "<head>" & vbCrlf & "<meta charset='UTF-8'>" & vbCrlf & _
-   "<title>" & title & "</title>" & vbCrlf & _
-   "<style>" & vbCrlf & _
-   ".blink{animation:blinker 1s linear infinite;}" & _
-   "@keyframes blinker{50%{opacity:0;}}" & vbCrlf & _
-   "</style>" & vbCrlf & _
-   "<link rel='stylesheet' type='text/css' href='../styles/source-code-pro.css'>" & vbCrlf & _
-   "</head>" & vbCrlf & "<body style='background-color:" & bgColor & ";'>" & vbCrlf & _
-   "<p style='font-family:" & FONT_FAMILY & ";font-size:" & FONT_SIZE & ";white-space:nowrap;padding:0;color:" & fgColor & ";background-color:" & bgColor & ";'>" & vbCrlf & _
-   "<!-- " & title & " file generated on " & Now & " -->" & vbCrlf
-   
-   '"<link rel='stylesheet' type='text/css' href='../styles/cp437.css'>" & vbCrlf & _
+
+oStream.WriteText "<div style='font-family:" & FONT_FAMILY & ";white-space:nowrap;padding:0;color:" & fgColor & ";background-color:" & bgColor & ";'>" & vbCrlf & _
+             "<style>" & vbCrlf & ".blink{animation:blinker 1s linear infinite;}" & vbCrlf & "@keyframes blinker{50%{opacity:0;}}" & vbCrlf & "</style>" & vbCrlf & _
+             "<!-- " & title & " file generated on " & Now & " -->" & vbCrlf & _
+             "<pre style='font-family:" & FONT_FAMILY & ";'>" & vbCrLf
 
 Set fso = CreateObject("Scripting.FileSystemObject")
 If fso.FileExists(sourceFile) Then
@@ -151,8 +148,8 @@ If fso.FileExists(sourceFile) Then
    ' Open the ANSI source file.
    Set fAnsiSource = fso.OpenTextFile(sourceFile, FOR_READING)
    ansiData = RearrangeAnsiData(fAnsiSource.ReadAll)
-   fAnsiSource.Close      
-
+   fAnsiSource.Close
+   
    ' Begin reading the ANSI contents
    For i = startPos To Len(ansiData)
 
@@ -165,50 +162,60 @@ If fso.FileExists(sourceFile) Then
       If colPos = 80 Then
          colPos = 0
          If charCode <> 13 and charCode <> 10 Then
-            htmlOutput = htmlOutput & "<br/>" & vbCrlf
+            'oStream.WriteText "<br/>" & vbCrlf
+            oStream.WriteText vbCrlf
          End If
       End If
 
       If charCode = 13 Then
-         htmlOutput = htmlOutput & "<br/>" & vbCrlf
+         'oStream.WriteText "<br/>" & vbCrlf
+         oStream.WriteText vbCrlf
          colPos = 0
          If Asc(Mid(ansiData, i + 1, 1)) = 10 Then
             i = i + 1 ' Advance the parser past the LF.
          End If
       ElseIf charCode = 10 Then
-         htmlOutput = htmlOutput & "<br/>" & vbCrlf
+         'oStream.WriteText "<br/>" & vbCrlf
+         oStream.WriteText vbCrlf
          colPos = 0
       ElseIf charCode = 32 Then
-         htmlOutput = htmlOutput & "&nbsp;"
+         'oStream.WriteText "&nbsp;"
+         oStream.WriteText " "
+         colPos = colPos + 1
+      ElseIf charCode = 0 Then
+         oStream.WriteText " "
          colPos = colPos + 1
          
       ElseIf charAtI = "<" Then
-         htmlOutput = htmlOutput & "&lt;"
+         oStream.WriteText "&lt;"
          colPos = colPos + 1
       ElseIf charAtI = ">" Then
-         htmlOutput = htmlOutput & "&gt;"
+         oStream.WriteText "&gt;"
          colPos = colPos + 1
       ElseIf charAtI = "&" Then
-         htmlOutput = htmlOutput & "&amp;"
+         oStream.WriteText "&amp;"
          colPos = colPos + 1
       ElseIf charAtI = "'" Then
-         htmlOutput = htmlOutput & "&#39;"
+         oStream.WriteText "&#39;"
          colPos = colPos + 1
       ElseIf charAtI = """" Then
-         htmlOutput = htmlOutput & "&quot;"
+         oStream.WriteText "&quot;"
          colPos = colPos + 1
          
       ElseIf Mid(ansiData, i, 2) = CSI Then
          ' Start of ANSI escape sequence...
+      
+         'Wscript.echo "CSI at " & i
 
          ' Terminate the previous span tag if one was started.
          If spanTag <> "" Then
-            htmlOutput = htmlOutput & "</span>"
+            oStream.WriteText "</span>"
          End If
 
          ' Locate the next alpha after this point
          escapeSequence = Mid(ansiData, i, InStrNextAlpha(i, ansiData, csiFinalByte) - i)
          csiParams = Mid(escapeSequence, 3)
+         'Wscript.echo csiParams
 
          ' Advance the parser.
          i = i + Len(escapeSequence)
@@ -283,13 +290,14 @@ If fso.FileExists(sourceFile) Then
                spanTag = "<span " & blink & "style='color:" & SetColorIntensity(fgColor, fgIntensity) & ";background-color:" & bgColor & ";'>"
 
          End Select
+         'Wscript.echo spanTag
 
-         htmlOutput = htmlOutput & spanTag
+         oStream.WriteText spanTag
       ElseIf (charCode >= 1 And charCode <= 31) Or (charCode >= 127 And charCode <= 254) Then
-         htmlOutput = htmlOutput & ToHtmlEntity(charCode)
+         oStream.WriteText ToHtmlEntity(charCode)
          colPos = colPos + 1
       Else
-         htmlOutput = htmlOutput & charAtI
+         oStream.WriteText charAtI
          colPos = colPos + 1
       End If
 
@@ -297,16 +305,14 @@ If fso.FileExists(sourceFile) Then
 
    ' Terminate the last span tag if needed.
    If spanTag <> "" Then
-      htmlOutput = htmlOutput & "</span>"
+      oStream.WriteText "</span>"
    End If
 
-   htmlOutput = htmlOutput & vbCrLf & "<br/><br/><span style='color:" & DARKGRAY & ";background-color:" & BLACK & ";'>(updated at " & (fso.GetFile(sourceFile)).DateLastModified & ")</span>" & vbCrLf
-   htmlOutput = htmlOutput & vbCrlf & "</p>" & vbCrlf & "</body>" & vbCrlf & "</html>"
-
-   ' Write the html output.
-   Set fHtmlTarget = fso.OpenTextFile(targetFile, FOR_WRITING, True)
-   fHtmlTarget.Write htmlOutput
-   fHtmlTarget.Close
+   oStream.WriteText vbCrLf & "</pre><br/><br/><span style='color:" & DARKGRAY & ";background-color:" & BLACK & ";'>(updated at " & (fso.GetFile(sourceFile)).DateLastModified & ")</span>" & vbCrLf
+   oStream.WriteText vbCrlf & "</div>"
+   
+   oStream.SaveToFile targetFile, 2
+   oStream.Close
 
 End If
 
@@ -315,10 +321,9 @@ End If
 
 ' *** FUNCTIONS ***
 
-'! Rearrange ANSI data so that it's in sequential left-to-right order,
-'! containing only "m" sequences, with all cursor movement sequences removed.
-'! i.e.: result should be the final ANSI image displayed, rather than the
-'!       cursor-by-cursor movement or animation that generated it.
+'! Removes cursor movement sequences.
+'! Result should be the final ANSI image displayed, rather than the
+'! cursor-by-cursor movement or animation that generated it.
 '!
 '! @param  ansiData   The raw ANSI data from the file.
 '! @return            The rearranged ANSI data containing only "m" sequences.
@@ -340,9 +345,14 @@ Function RearrangeAnsiData(ansiData)
    Dim newEscSeq
    Dim args
    Dim prevCol
-   Dim prevRow
+   'Dim prevRow
    Dim cBuf
    Dim rBuf
+   Dim rowPrev
+   Dim colPrev
+   Dim adding
+   Dim a
+   
 
    ' Let's declare a two-dimensional array that will contain what's basically
    ' a screen buffer.
@@ -351,11 +361,7 @@ Function RearrangeAnsiData(ansiData)
    ' Pre-populate the screen buffer with spaces.
    For rBuf = 0 To UBound(screenBuffer, 2)
       For cBuf = 1 To UBound(screenBuffer, 1)
-         'If cBuf >= MAX_COLS Then
-         '   screenBuffer(cBuf, rBuf) = vbCrLf ' Not needed anymore.
-         'Else
-            screenBuffer(cBuf, rBuf) = " "
-         'End If
+         screenBuffer(cBuf, rBuf) = " "
       Next
    Next
 
@@ -372,6 +378,7 @@ Function RearrangeAnsiData(ansiData)
          ' Locate the next alpha after this point
          escSeq = Mid(ansiData, j, InStrNextAlpha(j, ansiData, csiLastByte) - j)
          csiArgs = Mid(escSeq, 3)
+         'Wscript.echo "csiArgs: " & csiArgs
 
          ' Advance the parser.
          j = j + Len(escSeq)
@@ -442,11 +449,11 @@ Function RearrangeAnsiData(ansiData)
                col = CInt(colSav)
             'Case "2J"  ' Erase display (?)
             'Case "K"   ' Erase line (?) -- Problematic..?
-            '   Wscript.echo "Clearing row " & row
+            '  'wscript.echo "Clearing row " & row
             '   Dim k
             '   If Ubound(screenBuffer, 2) > 1 Then
             '      For k = 1 to Ubound(screenBuffer, 2)
-            '         Wscript.echo "k " & k
+            '        'wscript.echo "k " & k
             '         screenBuffer(k, row) = ""
             '      Next
             '   End If
@@ -454,10 +461,17 @@ Function RearrangeAnsiData(ansiData)
             'Case "l"   ' Reset mode
             'Case "p"   ' Set keyboard strings (most likely won't be implemented)
             Case Else ' Store the escape sequence to travel with the next characters
-               newEscSeq = escSeq & csiLastByte
+            
+               if rowPrev = row and colPrev = col then
+                  newEscSeq = newEscSeq & escSeq & csiLastByte
+               else
+                  newEscSeq = escSeq & csiLastByte
+               end if
                
-               'wscript.echo "(row: " & row & ", col: " & col & ") escSeq: " & escSeq
-
+               'wscript.echo "(row: " & row & ", col: " & col & ") escSeq: " & escSeq & ", newEscSeq: " & newEscSeq
+               rowPrev = row
+               colPrev = col
+               
          End Select
 
          If row < 1 Then
@@ -465,17 +479,36 @@ Function RearrangeAnsiData(ansiData)
          End If
          If col < 1 Then
             col = 1
-         End If
-         
+         End If         
 
       Else
 
          ' Store the previous row and column before incrementing them.
-         prevRow = row
-         prevCol = col ' Not needed?
-         
+         'prevRow = row
+         prevCol = col ' Not needed?         
 
-         If chrCode = 13 Then
+         'wscript.echo "newEscSeq: " & newEscSeq
+      
+         ' Need to drop the newEscSeq whereever it is...
+         'If newEscSeq <> "" Then
+         '   wscript.echo "row: " & row
+         '   if row <= UBound(screenBuffer, 2) then
+         '      screenBuffer(col, row) = newEscSeq
+         '   end if
+         '   newEscSeq = ""
+         ' 
+         'end if       
+
+        'wscript.echo chrCode
+
+         If chrCode = 13 Then       
+            'If newEscSeq <> "" Then
+            '  if row <= UBound(screenBuffer, 2) then
+            '     'wscript.echo "CR: " & newEscSeq                  
+            '     screenBuffer(col, row) = " " & newEscSeq
+            '  end if
+            'end if
+            
             row = row + 1
             col = 1
             If j + 1 <= Len(ansiData) Then
@@ -483,53 +516,73 @@ Function RearrangeAnsiData(ansiData)
                   j = j + 1 ' Advance the parser past the LF.
                End If
             End If
-         ElseIf charCode = 10 Then
+         ElseIf charCode = 10 Then  
+            'If newEscSeq <> "" Then
+            '   wscript.echo "LF: " & newEscSeq
+            'end if
+            'screenBuffer(col, row) = screenBuffer(col, row) & newEscSeq & charAtJ
+'            & charAtJ         
             row = row + 1
             col = 1
          Else
+         
             ' Append a line if it goes beyond the current max.
             If row > UBound(screenBuffer, 2) Then
+               adding = row - UBound(screenBuffer, 2)
+               'wscript.echo "adding: " & adding
                ReDim Preserve screenBuffer(MAX_COLS, row)
 
                ' Initialize the new row with all blanks/CR-LFs.
-               For cBuf = 1 To UBound(screenBuffer, 1)
-                  'If cBuf >= MAX_COLS Then
-                  '   screenBuffer(cBuf, row) = vbCrLf ' Not needed.
-                  'Else
-                  'If cBuf <= 1 Then
-                  '   screenBuffer(cBuf, row) = CSI & "40m "
-                  'Else
-                     screenBuffer(cBuf, row) = " "
-                  'End If
+               For a = 1 to adding Step 1
+                  For cBuf = 1 To UBound(screenBuffer, 1)
+                     screenBuffer(cBuf, row-(a-1)) = " "
+                  Next
                Next
+               'wscript.echo "Added row " & row 
             End If
 
-            ' TODO...
-            ' - Find a way to preserve CSI codes when re-entering a cell...
+            ' TODO...?
+            ' - Find a way to preserve CSI codes when re-entering a cell...?
             
             'if screenBuffer(col, row) <> "" then
-            '   wscript.echo "Something's here (col: " & col & ", row: " & row & ") already: '{" & screenBuffer(col, row) & "}"
-            '   wscript.echo "Replacing with {" & newEscSeq & charAtJ & "}"
+              'wscript.echo "Something's here (col: " & col & ", row: " & row & ") already: {" & screenBuffer(col, row) & "}"
+              'wscript.echo "Replacing with {" & newEscSeq & charAtJ & "}"
             'end if
-
+            
+            'if row=3 then
+              'wscript.echo "newEscSeq ( " & col & "): " & newEscSeq
+               'wscript.echo "charAtJ: " & charAtJ
+            'end if
+         
             screenBuffer(col, row) = newEscSeq & charAtJ
-            col = col + 1
+            'screenBuffer(col, row) = charAtJ
+            
             ' Clear the newEscSeq after using it, don't need it again.
             If newEscSeq <> "" Then
+               'wscript.echo "newEscSeq (row:" & row & ",col:" & col & "): " & newEscSeq
                newEscSeq = ""
             End If
+            
+            col = col + 1
+            
             ' Reached the end of the screen.
             If col > MAX_COLS Then
                col = 1
                row = row + 1
             End If
          End If
-      End if
+      End If
    Next
 
    ' Now form new ansiData out of the screen buffer contents.
    For rBuf = 0 To UBound(screenBuffer, 2)
       For cBuf = 1 To UBound(screenBuffer, 1)
+         'if rBuf=3 then
+           'wscript.echo "appending: " & screenBuffer(cBuf, rBuf)
+         'end if
+         
+         ' TODO - replace this with an ADO Stream object...
+         '        No more concatenation.
          returnAnsi = returnAnsi & screenBuffer(cBuf, rBuf)
       Next
    Next
@@ -599,6 +652,10 @@ End Function
 
 '! Translates an ANSI character value from code page 437 to its modern HTML
 '! equivalent.
+'! 
+'! Could use an array for these instead, but with the huge gap between 31 
+'! and 127 there would be a lot of wasted elements. Probably not much 
+'! gained anyway.
 '!
 '! @param  ansiCharCode  The character to translate.
 '! @return               The HTML symbol entity equivalent of the ANSI
