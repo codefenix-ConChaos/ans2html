@@ -329,8 +329,8 @@ Function FlattenAnsi(ansiData)
    Dim colSav
    Dim newEscSeq
    Dim args
-   Dim prevCol
-   Dim prevRow
+   'Dim prevCol
+   'Dim prevRow
    Dim cBuf
    Dim rBuf
    Dim adding
@@ -417,7 +417,7 @@ Function FlattenAnsi(ansiData)
                End If
                col = col + CInt(csiArgs)
             Case "D"   ' Cursor Backward
-               If prevCol <= MAX_COLS And prevRow <= UBound(screenBuffer, 2) Then
+               If col <= MAX_COLS And row <= UBound(screenBuffer, 2) Then
                   screenBuffer(col, row) = CSI & "40m" & screenBuffer(col, row)
                End If
                newEscSeq = ""
@@ -458,9 +458,9 @@ Function FlattenAnsi(ansiData)
 
       Else
       
-         ' Store the previous row and column before incrementing them.
-         prevRow = row
-         prevCol = col        
+      ' Store the previous row and column before incrementing them. (not needed anymore?)
+         'prevRow = row  
+         'prevCol = col        
 
          If chrCode = 13 Then       
             if row <= UBound(screenBuffer, 2) then               
