@@ -16,10 +16,9 @@
 '!   equivalent HTML entity.
 '!   See: https://en.wikipedia.org/wiki/Code_page_437
 '!
-'!   After reading the ANSI source data, the script will first attempt to
-'!   rearrange it in a "linear" format.  In other words, eliminate all cursor 
-'!   movement sequences so that it need only convert the "m" escape sequences
-'!   for in-line text coloring.
+'!   After reading the ANSI source data, the script will first "flatten" it,
+'!   eliminating all cursor movement sequences so that it need only convert 
+'!   the "m" escape sequences for in-line text coloring.
 '!
 '!   The "Source Code Pro" font is optional but highly recommended for best
 '!   results. Download it from https://github.com/adobe-fonts/source-code-pro
@@ -29,18 +28,6 @@
 '!   especially on mobile browsers.
 '!
 '! Known issues:
-'!
-'!   The HTML output that results is generally very good, certainly good enough
-'!   for me.  However, occasionally there are glitches when converting certain
-'!   ANSI files, usually in the form of unexpected background colors, or extra
-'!   line-breaks being detected and inserted into the output.  My way of
-'!   troubleshooting these issues so far has been to step through the ANSI file
-'!   one character at a time to determine what the expected output should be.
-'!   I've managed to overcome most of the issues I've seen, but I still get the
-'!   occasional ANSI file that produces something that's not quite right.
-'!   In other words, your mileage may vary.  As a rule, it will generally work
-'!   best on simple score bulletins, and less than ideally on more complicated
-'!   ANSI art.
 '!
 '!   Blinking text is achieved using CSS (built into the "htmlOutput" string)
 '!   but it needs work to allow alternating between foreground and background
@@ -56,8 +43,6 @@
 '!
 '! TODO:
 '! - Improve CSS blink.
-'! - Consider a rewrite in Javascript, which would allow cross-platform
-'!   support in Synchronet.
 '!
 '!
 
@@ -147,7 +132,7 @@ If fso.FileExists(sourceFile) Then
 
    ' Open the ANSI source file.
    Set fAnsiSource = fso.OpenTextFile(sourceFile, FOR_READING)
-   ansiData = RearrangeAnsiData(fAnsiSource.ReadAll)
+   ansiData = FlattenAnsi(fAnsiSource.ReadAll)
    fAnsiSource.Close
    
    ' Begin reading the ANSI contents
@@ -225,7 +210,7 @@ If fso.FileExists(sourceFile) Then
             '      https://en.wikipedia.org/wiki/ANSI_escape_code#Terminal_output_sequences
             '
             ' Only "m" is implemented here. The rest are all implemented in
-            ' the RearrangeAnsiData function.
+            ' the FlattenAnsi function.
 
             Case "m"
                ' Set Graphics Mode
@@ -328,7 +313,7 @@ End If
 '! @param  ansiData   The raw ANSI data from the file.
 '! @return            The rearranged ANSI data containing only "m" sequences.
 '!
-Function RearrangeAnsiData(ansiData)
+Function FlattenAnsi(ansiData)
    Const MAX_COLS = 80 ' Standard 80 column width
    Const STARTING_ROWS = 5
    Dim returnAnsi
@@ -345,22 +330,15 @@ Function RearrangeAnsiData(ansiData)
    Dim newEscSeq
    Dim args
    Dim prevCol
-   'Dim prevRow
+   Dim prevRow
    Dim cBuf
    Dim rBuf
-   Dim rowPrev
-   Dim colPrev
    Dim adding
    Dim a
    
-
-   ' Let's declare a two-dimensional array that will contain what's basically
-   ' a screen buffer.
    ReDim screenBuffer(MAX_COLS, STARTING_ROWS)
-
-   ' Pre-populate the screen buffer with spaces.
    For rBuf = 0 To UBound(screenBuffer, 2)
-      For cBuf = 1 To UBound(screenBuffer, 1)
+      For cBuf = 0 To UBound(screenBuffer, 1)
          screenBuffer(cBuf, rBuf) = " "
       Next
    Next
@@ -372,13 +350,12 @@ Function RearrangeAnsiData(ansiData)
    For j = 1 To Len(ansiData)
       charAtJ = Mid(ansiData, j, 1)
       chrCode = Asc(charAtJ)
-
+      
       If Mid(ansiData, j, 2) = CSI Then
 
          ' Locate the next alpha after this point
          escSeq = Mid(ansiData, j, InStrNextAlpha(j, ansiData, csiLastByte) - j)
          csiArgs = Mid(escSeq, 3)
-         'Wscript.echo "csiArgs: " & csiArgs
 
          ' Advance the parser.
          j = j + Len(escSeq)
@@ -397,7 +374,7 @@ Function RearrangeAnsiData(ansiData)
                   row = CInt(csiArgs) ' n
                   col = 1
                Else
-                  row = 1 ' Default to 1 if no arguments
+                  row = 1
                   col = 1
                End If
             Case "f" ' Cursor position, same as "H"
@@ -412,33 +389,40 @@ Function RearrangeAnsiData(ansiData)
                   row = CInt(csiArgs) ' n
                   col = 1
                Else
-                  row = 1 ' Default to 1 if no arguments
+                  row = 1
                   col = 1
                End If
             Case "A"   ' Cursor Up
+               newEscSeq = ""
                If csiArgs = "" Then
-                  csiArgs = 1 ' Default to 1 if no arguments
+                  csiArgs = 1
                End If
                row = row - CInt(csiArgs)
             Case "B"   ' Cursor Down
+               newEscSeq = ""
                If csiArgs = "" Then
-                  csiArgs = 1 ' Default to 1 if no arguments
+                  csiArgs = 1
                End If
                row = row + CInt(csiArgs)
             Case "C"   ' Cursor Forward
-               ' There is apparently an undocumented but implied cancellation of the last
-               ' SGR sequence (m) whenever the "cursor" moves FORWARD, therefore we're appending
-               ' said cancellation explicitly immediately before the "C" cursor movement.
-               If prevCol <= MAX_COLS And row <= UBound(screenBuffer, 2) Then
-                  screenBuffer(prevCol, row) = screenBuffer(prevCol , row) & CSI & "40m"
+               ' Cancel the last SGR sequence before moving the "cursor", 
+               ' otherwise it will drag the sequence with it, leading
+               ' to an incorrect background and/or foreground color.
+               if col <= MAX_COLS And row <= UBound(screenBuffer, 2) Then
+                  screenBuffer(col, row) = CSI & "40m" & screenBuffer(col, row)
                End If
+               newEscSeq = ""
                If csiArgs = "" Then
-                  csiArgs = 1 ' Default to 1 if no arguments
+                  csiArgs = 1 
                End If
                col = col + CInt(csiArgs)
             Case "D"   ' Cursor Backward
+               If prevCol <= MAX_COLS And prevRow <= UBound(screenBuffer, 2) Then
+                  screenBuffer(col, row) = CSI & "40m" & screenBuffer(col, row)
+               End If
+               newEscSeq = ""
                If csiArgs = "" Then
-                  csiArgs = 1 ' Default to 1 if no arguments
+                  csiArgs = 1 
                End If
                col = col - CInt(csiArgs)
             Case "s"   ' Save cursor position
@@ -461,16 +445,7 @@ Function RearrangeAnsiData(ansiData)
             'Case "l"   ' Reset mode
             'Case "p"   ' Set keyboard strings (most likely won't be implemented)
             Case Else ' Store the escape sequence to travel with the next characters
-            
-               if rowPrev = row and colPrev = col then
-                  newEscSeq = newEscSeq & escSeq & csiLastByte
-               else
-                  newEscSeq = escSeq & csiLastByte
-               end if
-               
-               'wscript.echo "(row: " & row & ", col: " & col & ") escSeq: " & escSeq & ", newEscSeq: " & newEscSeq
-               rowPrev = row
-               colPrev = col
+               newEscSeq = newEscSeq & escSeq & csiLastByte
                
          End Select
 
@@ -482,33 +457,15 @@ Function RearrangeAnsiData(ansiData)
          End If         
 
       Else
-
-         ' Store the previous row and column before incrementing them.
-         'prevRow = row
-         prevCol = col ' Not needed?         
-
-         'wscript.echo "newEscSeq: " & newEscSeq
       
-         ' Need to drop the newEscSeq whereever it is...
-         'If newEscSeq <> "" Then
-         '   wscript.echo "row: " & row
-         '   if row <= UBound(screenBuffer, 2) then
-         '      screenBuffer(col, row) = newEscSeq
-         '   end if
-         '   newEscSeq = ""
-         ' 
-         'end if       
-
-        'wscript.echo chrCode
+         ' Store the previous row and column before incrementing them.
+         prevRow = row
+         prevCol = col        
 
          If chrCode = 13 Then       
-            'If newEscSeq <> "" Then
-            '  if row <= UBound(screenBuffer, 2) then
-            '     'wscript.echo "CR: " & newEscSeq                  
-            '     screenBuffer(col, row) = " " & newEscSeq
-            '  end if
-            'end if
-            
+            if row <= UBound(screenBuffer, 2) then               
+               screenBuffer(col, row) = newEscSeq & screenBuffer(col, row)
+            end if
             row = row + 1
             col = 1
             If j + 1 <= Len(ansiData) Then
@@ -517,11 +474,9 @@ Function RearrangeAnsiData(ansiData)
                End If
             End If
          ElseIf charCode = 10 Then  
-            'If newEscSeq <> "" Then
-            '   wscript.echo "LF: " & newEscSeq
-            'end if
-            'screenBuffer(col, row) = screenBuffer(col, row) & newEscSeq & charAtJ
-'            & charAtJ         
+            if row <= UBound(screenBuffer, 2) then
+               screenBuffer(col, row) = newEscSeq & screenBuffer(col, row)
+            end if
             row = row + 1
             col = 1
          Else
@@ -529,7 +484,6 @@ Function RearrangeAnsiData(ansiData)
             ' Append a line if it goes beyond the current max.
             If row > UBound(screenBuffer, 2) Then
                adding = row - UBound(screenBuffer, 2)
-               'wscript.echo "adding: " & adding
                ReDim Preserve screenBuffer(MAX_COLS, row)
 
                ' Initialize the new row with all blanks/CR-LFs.
@@ -538,28 +492,12 @@ Function RearrangeAnsiData(ansiData)
                      screenBuffer(cBuf, row-(a-1)) = " "
                   Next
                Next
-               'wscript.echo "Added row " & row 
             End If
-
-            ' TODO...?
-            ' - Find a way to preserve CSI codes when re-entering a cell...?
-            
-            'if screenBuffer(col, row) <> "" then
-              'wscript.echo "Something's here (col: " & col & ", row: " & row & ") already: {" & screenBuffer(col, row) & "}"
-              'wscript.echo "Replacing with {" & newEscSeq & charAtJ & "}"
-            'end if
-            
-            'if row=3 then
-              'wscript.echo "newEscSeq ( " & col & "): " & newEscSeq
-               'wscript.echo "charAtJ: " & charAtJ
-            'end if
          
             screenBuffer(col, row) = newEscSeq & charAtJ
-            'screenBuffer(col, row) = charAtJ
             
             ' Clear the newEscSeq after using it, don't need it again.
             If newEscSeq <> "" Then
-               'wscript.echo "newEscSeq (row:" & row & ",col:" & col & "): " & newEscSeq
                newEscSeq = ""
             End If
             
@@ -571,23 +509,20 @@ Function RearrangeAnsiData(ansiData)
                row = row + 1
             End If
          End If
-      End If
+      End If      
+      
    Next
 
    ' Now form new ansiData out of the screen buffer contents.
-   For rBuf = 0 To UBound(screenBuffer, 2)
+   For rBuf = 1 To UBound(screenBuffer, 2)
       For cBuf = 1 To UBound(screenBuffer, 1)
-         'if rBuf=3 then
-           'wscript.echo "appending: " & screenBuffer(cBuf, rBuf)
-         'end if
-         
          ' TODO - replace this with an ADO Stream object...
          '        No more concatenation.
          returnAnsi = returnAnsi & screenBuffer(cBuf, rBuf)
       Next
    Next
 
-   RearrangeAnsiData = returnAnsi
+   FlattenAnsi = returnAnsi
 End Function
 
 '! Searches a string for the position of the next alpha character.
