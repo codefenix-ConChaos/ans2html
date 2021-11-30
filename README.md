@@ -9,10 +9,9 @@
   equivalent HTML entity.
   See: https://en.wikipedia.org/wiki/Code_page_437
 
-  After reading the ANSI source data, the script will first attempt to
-  rearrange it in a "linear" format.  In other words, eliminate all cursor 
-  movement sequences so that it need only convert the "m" escape sequences
-  for in-line text coloring.
+  After reading the ANSI source data, the script will first "flatten" it,
+  eliminating all cursor movement sequences so that it need only convert 
+  the "m" escape sequences for in-line text coloring.
 
   The "Source Code Pro" font is optional but highly recommended for best
   results. Download it from https://github.com/adobe-fonts/source-code-pro
@@ -21,23 +20,16 @@
   leading to mixed results for box and line drawing characters,
   especially on mobile browsers.
   
-**Example output:**
+**Example score bulletin output:**
   - Legend of the Red Dragon Player Rankings: https://conchaos.synchro.net/doors/lord_1scores.html
   - Operation Overkill Top 10: https://conchaos.synchro.net/doors/ooii-a_1scores.html
+  - Rockin Radio Top 10: https://conchaos.synchro.net/doors/rradio_1scores.html
+
+**Other examples:**
+  - TradeWars 2002 Cineplex: https://conchaos.synchro.net/doors/CINEPLEX.html
+  - TradeWars 2002 Derelict Spacecraft: https://conchaos.synchro.net/doors/ALN1.html
 
 **Known issues:**
-
-  The HTML output that results is generally very good, certainly good enough
-  for me.  However, occasionally there are glitches when converting certain
-  ANSI files, usually in the form of unexpected background colors, or extra
-  line-breaks being detected and inserted into the output.  My way of
-  troubleshooting these issues so far has been to step through the ANSI file
-  one character at a time to determine what the expected output should be.
-  I've managed to overcome most of the issues I've seen, but I still get the
-  occasional ANSI file that produces something that's not quite right.
-  In other words, your mileage may vary.  As a rule, it will generally work
-  best on simple score bulletins, and less than ideally on more complicated
-  ANSI art.
 
   Blinking text is achieved using CSS (built into the "htmlOutput" string)
   but it needs work to allow alternating between foreground and background
@@ -53,7 +45,5 @@ in double-quotes.
 
 **TODO:**
 - Improve CSS blink.
-- Consider a rewrite in Javascript, which would allow cross-platform
-  support in Synchronet.
 
 
