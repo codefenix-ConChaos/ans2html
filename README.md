@@ -20,6 +20,13 @@
   leading to mixed results for box and line drawing characters,
   especially on mobile browsers.
 
+  Blinking text is achieved using keyframes, setting the color:hsla propery
+  in CSS.
+
+  The `<head>` tags, `<body>` tags, and outer `<html>` tags are all 
+  intentionally left out of the resulting HTML, since they're not needed 
+  for my specific purposes. One could easily add them if wanted.
+
 **Usage:**
 
   `cscript ans2html.vbs path_to_ansi.ans path_to_html.html [page_title]`
@@ -36,14 +43,4 @@ in double-quotes.
   - TradeWars 2002 Cineplex: https://conchaos.synchro.net/doors/CINEPLEX.html
   - TradeWars 2002 Derelict Spacecraft: https://conchaos.synchro.net/doors/ALN1.html
 
-**Known issues:**
-
-  Blinking text:
-   - This is achieved using CSS. It's deliberately a gentle fade rather than an abrupt flash, intended to be easier on the eyes.
-   - It needs work. Currently it fades both the foreground and background colors to black. Ideally, it should fade from the current foreground color to the current background color.
-
-
-**TODO:**
-- Improve CSS blink.
-
-
+Enjoy!
