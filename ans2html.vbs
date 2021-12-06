@@ -26,12 +26,13 @@
 '!   web browsers will default to whatever monospace font is configured,
 '!   leading to mixed results for box and line drawing characters,
 '!   especially on mobile browsers.
+'!   
+'!   Blinking text is achieved using keyframes, setting the color:hsla propery
+'!   in CSS.
 '!
-'! Known issues:
-'!
-'!   Blinking text is achieved using CSS (built into the "htmlOutput" string)
-'!   but it needs work to allow alternating between foreground and background
-'!   colors.  Currently it just blinks them simultaneously.
+'!   The <head> tags, <body> tags, and outer <html> tags are all intentionally
+'!   left out of the resulting HTML, since they're not needed for my specific 
+'!   purposes. One could easily add them if wanted.
 '!
 '! Usage:
 '!
@@ -40,10 +41,7 @@
 '! Probably goes without saying, but paths containing spaces must be wrapped
 '! in double-quotes.
 '!
-'!
-'! TODO:
-'! - Improve CSS blink.
-'!
+'! Enjoy!
 '!
 
 Option Explicit
@@ -123,7 +121,7 @@ fgColor = GRAY
 bgColor = BLACK
 
 oStream.WriteText "<div style='font-family:" & FONT_FAMILY & ";white-space:nowrap;padding:0;color:" & fgColor & ";background-color:" & bgColor & ";'>" & vbCrlf & _
-             "<style>" & vbCrlf & ".blink{animation:blinker 1s linear infinite;}" & vbCrlf & "@keyframes blinker{50%{opacity:0;}}" & vbCrlf & "</style>" & vbCrlf & _
+             "<style>" & vbCrlf & ".blink{animation:blinker 1s linear infinite;}" & vbCrlf & "@keyframes blinker{50%{color:hsla(0,0%,0%,0.0);}}" & vbCrlf & "</style>" & vbCrlf & _
              "<!-- " & title & " file generated on " & Now & " -->" & vbCrlf & _
              "<pre style='font-family:" & FONT_FAMILY & ";'>" & vbCrLf
 
