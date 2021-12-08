@@ -27,8 +27,9 @@
 '!   leading to mixed results for box and line drawing characters,
 '!   especially on mobile browsers.
 '!   
-'!   Blinking text is achieved using keyframes, setting the color:hsla propery
-'!   in CSS.
+'!   Blinking text is achieved using keyframes, setting the color:hsla property
+'!   in CSS. The fade effect is deliberate, but can be replaced by a steady 
+'!   blink by changing "linear" to "step-end" in the CSS animation properties.
 '!
 '!   The <head> tags, <body> tags, and outer <html> tags are all intentionally
 '!   left out of the resulting HTML, since they're not needed for my specific 
