@@ -1,0 +1,12 @@
+@font-face{
+    /* Download oldschool_pc_font_pack_v2.2_web.zip from:
+     *  https://int10h.org/oldschool-pc-fonts/download    
+     *
+     * Extract the contents of "woff - Web (webfonts)" to
+     * a subdirectory named "web437" in your web folder.
+     */
+    font-family: 'Web437 IBM VGA';
+    font-style: normal;
+    font-stretch: normal;
+    src: url('./web437/Web437_IBM_VGA_8x16.woff') format('woff');
+}
