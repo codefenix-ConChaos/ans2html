@@ -2,13 +2,19 @@
 '! (ans2html.vbs)
 '! Author:           Craig Hendricks (aka Codefenix)
 '! Initial Version:  3/15/2021
-'!
+'! Updated:          4/23/2023
 '! ============================================================================
 '!
 '! Description:
 '!
 '!   This VBScript is for converting an ANSI file to a HTML file.  Useful for
 '!   displaying BBS door game scores on a website.
+'!
+'!   Also optionally supports other common coloring schemes:
+'!   - Pipes |
+'!   - Tildes ~
+'!   - RTSoft ` codes (LoRD, LoRD2, TEOS, and others)
+'!   - Yankee Trader Galactic Newspaper
 '!
 '!   It reads each character from a standard ANSI source file and generates
 '!   a file containing HTML5 markup.  It interprets most ANSI escape codes
@@ -17,27 +23,41 @@
 '!   See: https://en.wikipedia.org/wiki/Code_page_437
 '!
 '!   After reading the ANSI source data, the script will first "flatten" it,
-'!   eliminating all cursor movement sequences so that it need only convert 
-'!   the "m" escape sequences for in-line text coloring.
+'!   eliminating all cursor movement sequences so that it need only convert
+'!   the "m" escape sequences for in-line text coloring. This flattening does
+'!   not occur if the using the pipe, tilde, RTSoft, or Yankee Trader 
+'!   conversion modes.
 '!
-'!   The "Source Code Pro" font is optional but highly recommended for best
-'!   results. Download it from https://github.com/adobe-fonts/source-code-pro
-'!   and install it as a web font for your site.  If this font is not present,
-'!   web browsers will default to whatever monospace font is configured,
-'!   leading to mixed results for box and line drawing characters,
-'!   especially on mobile browsers.
-'!   
+'!   The IBM VGA font from the Ultimate Oldschool PC Font Pack is the optimal
+'!   font to use for displaying CP437 characters in browsers. Download it from 
+'!   https://int10h.org/oldschool-pc-fonts/download and set it up as a webfont
+'!   on your site. If this font is not present, web browsers will default to 
+'!   whatever default monospace font is configured, leading to mixed results 
+'!   for box and line drawing characters, especially on mobile browsers.
+'!
+'!   The "Source Code Pro" font is another good monospace font that gives nice
+'!   results. Download it from https://github.com/adobe-fonts/source-code-pro.
+'!
 '!   Blinking text is achieved using keyframes, setting the color:hsla property
-'!   in CSS. The fade effect is deliberate, but can be replaced by a steady 
-'!   blink by changing "linear" to "step-end" in the CSS animation properties.
-'!
-'!   The <head> tags, <body> tags, and outer <html> tags are all intentionally
-'!   left out of the resulting HTML, since they're not needed for my specific 
-'!   purposes. One could easily add them if wanted.
+'!   in CSS. Use either "linear" to "step-end" in the CSS animation properties
+'!   for a gentle fade or sharp flash.
 '!
 '! Usage:
 '!
-'!   cscript ans2html.vbs path_to_ansi.ans path_to_html.html [page_title]
+'!   cscript ans2html.vbs path_to_ansi.ans path_to_html.html [page_title] [opts]
+'!
+'! The "opts" can be any or all processing modes:
+'!
+'!   P: Pipe codes
+'!   T: Tilde codes
+'!   L: RTSoft "LoRD" codes
+'!   Y: Yankee Trader Galactic Newspaper bulletin prefixes
+'! 
+'! You must specify a page title if using one of the optional processing modes.
+'! 
+'! Example:
+'!
+'!   cscript ans2html.vbs c:\lord\LOGNOW.TXT c:\web\lord_news.html "LorD News" L
 '!
 '! Probably goes without saying, but paths containing spaces must be wrapped
 '! in double-quotes.
@@ -48,7 +68,7 @@
 Option Explicit
 On Error Resume Next
 
-' Constants
+' Constants -------------------------------------------------------------------
 Const FOR_READING = 1, FOR_WRITING = 2, FOR_APPEND = 8
 
 ' HTML hex values for the 16 ANSI text mode colors.
@@ -70,11 +90,11 @@ Const LIGHTMAGENTA = "#F5F"
 Const LIGHTCYAN = "#5FF"
 Const WHITE = "#FFF"
 
-' Best font for box drawing.
-Const FONT_FAMILY = """Source Code Pro"",monospace"
-Const FONT_SIZE = "13px" ' Set this to whatever size you like best.
+' Best font for displaying CP437 ANSI.
+Const FONT_FAMILY = "Web437 IBM VGA"
+Const FONT_PATH = "../styles/web437-ibm-vga.css"
 
-' Variables         Description:
+' Variables         Description -----------------------------------------------
 Dim CSI             ' See: https://en.wikipedia.org/wiki/ANSI_escape_code#CSI_sequences
 Dim args            ' Incoming arguments
 Dim fso             ' FileSystemObject
@@ -83,7 +103,6 @@ Dim sourceFile      ' ANSI source filename
 Dim targetFile      ' HTML output filename
 Dim title           ' Title of HTML output file
 Dim ansiData        ' Contents of ANSI source file
-Dim htmlOutput      ' HTML markup to be written
 Dim charAtI         ' Character At I
 Dim charCode        ' ASCII code of character at I
 Dim escapeSequence  ' ANSI escape code
@@ -99,41 +118,90 @@ Dim swapColor       ' Swap foreground and background colors
 Dim holdColor       ' Variable for holding a color if swapping
 Dim startPos        ' Reading start position. For now just 1.
 Dim colPos          ' Output column number. Used for auto-wrapping the output.
+Dim ignoreLF
 Dim i
 Dim oStream
 
-' Initialize
+Dim convertOptions
+Dim convertPipes
+Dim convertTildes
+Dim convertLord
+Dim convertYT
 
-Set oStream = CreateObject("ADODB.Stream")
-oStream.charSet = "ASCII"
-oStream.Open
-
-Set args = Wscript.Arguments
-sourceFile = args(0)
-targetFile = args(1)
-title = args(2)
-Wscript.echo title
-
+' Initialize Start-------------------------------------------------------------
+convertPipes = False
+convertTildes = False
+convertLord = False
+convertYT = False
 CSI = chr(27) & "["
 startPos = 1
 colPos = 0
 fgIntensity = 0
 fgColor = GRAY
 bgColor = BLACK
+ignoreLF = False
 
-oStream.WriteText "<div style='font-family:" & FONT_FAMILY & ";white-space:nowrap;padding:0;color:" & fgColor & ";background-color:" & bgColor & ";'>" & vbCrlf & _
-             "<style>" & vbCrlf & ".blink{animation:blinker 1s linear infinite;}" & vbCrlf & "@keyframes blinker{50%{color:hsla(0,0%,0%,0.0);}}" & vbCrlf & "</style>" & vbCrlf & _
-             "<!-- " & title & " file generated on " & Now & " -->" & vbCrlf & _
-             "<pre style='font-family:" & FONT_FAMILY & ";'>" & vbCrLf
+Set args = Wscript.Arguments
+sourceFile = args(0)
+targetFile = args(1)
+title = args(2)
+convertOptions = UCase(args(3))
+
+If InStr(convertOptions, "P") >= 1 Then
+   convertPipes = True
+   Wscript.echo "Pipe color conversion enabled"
+End If
+If InStr(convertOptions, "T") >= 1 Then
+   convertTildes = True
+   Wscript.echo "Tilde color conversion enabled"
+End If
+If InStr(convertOptions, "L") >= 1 Then
+   convertLord = True
+   Wscript.echo "LoRD color conversion enabled"
+End If
+If InStr(convertOptions, "Y") >= 1 Then
+   convertYT = True
+   Wscript.echo "Yankee Trader color processing enabled"
+End If
 
 Set fso = CreateObject("Scripting.FileSystemObject")
+' Initialize End --------------------------------------------------------------
+
 If fso.FileExists(sourceFile) Then
 
+   Wscript.echo title
+   Set oStream = CreateObject("ADODB.Stream")
+   oStream.charSet = "ASCII"
+   oStream.Open
+
+   oStream.WriteText "<!DOCTYPE html>" & vbCrlf & "<html lang='en'>" & vbCrlf & _
+                "<head>" & vbCrlf & "<meta charset='UTF-8'>" & vbCrlf & "<title>" & title & "</title>" & vbCrlf & _
+                "<style>" & vbCrlf & ".blink{animation:blinker 0.8s infinite step-end;}" & vbCrlf & "@keyframes blinker{50%{color:hsla(0,0%,0%,0.0);}}" & vbCrlf & "</style>" & vbCrlf & _
+                "<link rel='stylesheet' type='text/css' href='" & FONT_PATH & "'>" & vbCrlf & "</head>" & vbCrlf & _
+                "<body style='color:" & fgColor & ";background-color:" & bgColor & ";'>" & _
+                "<!-- " & title & " file generated on " & Now & " -->" & vbCrlf & _
+                "<pre style='font-family:""" & FONT_FAMILY & """,monospace;'>" & vbCrLf
+
    ' Open the ANSI source file.
-   Set fAnsiSource = fso.OpenTextFile(sourceFile, FOR_READING)
-   ansiData = FlattenAnsi(fAnsiSource.ReadAll)
+   Set fAnsiSource = fso.OpenTextFile(sourceFile, FOR_READING, False, 0)
+   If convertOptions = "" Then
+      ansiData = FlattenAnsi(fAnsiSource.ReadAll)
+   Else
+      ansiData = fAnsiSource.ReadAll
+   End If
    fAnsiSource.Close
-   
+
+   ' This simply inserts some pipe codes for Yankee Trader's galactic newspaper
+   ' bulletin, and then those pipe codes get converted.
+   If convertYT Then
+      ansiData = Replace(ansiData, vbCrLf & " *** ", vbCrLf & "|09 *** ") ' attacks
+      ansiData = Replace(ansiData, vbCrLf & " +++ ", vbCrLf & "|12 +++ ") ' xannor defeats
+      ansiData = Replace(ansiData, vbCrLf & "  -  ", vbCrLf & "|14  -  ") ' planetary headlines
+      ansiData = Replace(ansiData, vbCrLf & "-=*=-", vbCrLf & "|15-=*=-") ' Logons
+      ansiData = Replace(ansiData, vbCrLf, vbCrLf & "|02")                ' standard newspaper color
+      convertPipes = True
+   End If
+
    ' Begin reading the ANSI contents
    For i = startPos To Len(ansiData)
 
@@ -146,30 +214,30 @@ If fso.FileExists(sourceFile) Then
       If colPos = 80 Then
          colPos = 0
          If charCode <> 13 and charCode <> 10 Then
-            'oStream.WriteText "<br/>" & vbCrlf
             oStream.WriteText vbCrlf
          End If
       End If
 
       If charCode = 13 Then
-         'oStream.WriteText "<br/>" & vbCrlf
+         ignoreLF = True
          oStream.WriteText vbCrlf
          colPos = 0
-         If Asc(Mid(ansiData, i + 1, 1)) = 10 Then
-            i = i + 1 ' Advance the parser past the LF.
-         End If
+         'If Asc(Mid(ansiData, i + 1, 1)) = 10 Then
+         '   i = i + 1 ' Advance the parser past the LF.
+         'End If
       ElseIf charCode = 10 Then
-         'oStream.WriteText "<br/>" & vbCrlf
-         oStream.WriteText vbCrlf
-         colPos = 0
+         If ignoreLF = False Then
+            wscript.echo "not ignoring LF..."
+            oStream.WriteText vbCrlf
+            colPos = 0
+         End If
       ElseIf charCode = 32 Then
-         'oStream.WriteText "&nbsp;"
          oStream.WriteText " "
          colPos = colPos + 1
       ElseIf charCode = 0 Then
          oStream.WriteText " "
          colPos = colPos + 1
-         
+
       ElseIf charAtI = "<" Then
          oStream.WriteText "&lt;"
          colPos = colPos + 1
@@ -180,16 +248,14 @@ If fso.FileExists(sourceFile) Then
          oStream.WriteText "&amp;"
          colPos = colPos + 1
       ElseIf charAtI = "'" Then
-         oStream.WriteText "&#39;"
+         oStream.WriteText "&apos;"
          colPos = colPos + 1
       ElseIf charAtI = """" Then
          oStream.WriteText "&quot;"
          colPos = colPos + 1
-         
+
       ElseIf Mid(ansiData, i, 2) = CSI Then
          ' Start of ANSI escape sequence...
-      
-         'Wscript.echo "CSI at " & i
 
          ' Terminate the previous span tag if one was started.
          If spanTag <> "" Then
@@ -199,7 +265,6 @@ If fso.FileExists(sourceFile) Then
          ' Locate the next alpha after this point
          escapeSequence = Mid(ansiData, i, InStrNextAlpha(i, ansiData, csiFinalByte) - i)
          csiParams = Mid(escapeSequence, 3)
-         'Wscript.echo csiParams
 
          ' Advance the parser.
          i = i + Len(escapeSequence)
@@ -274,9 +339,382 @@ If fso.FileExists(sourceFile) Then
                spanTag = "<span " & blink & "style='color:" & SetColorIntensity(fgColor, fgIntensity) & ";background-color:" & bgColor & ";'>"
 
          End Select
-         'Wscript.echo spanTag
 
          oStream.WriteText spanTag
+
+      ElseIf charAtI = "|" And convertPipes Then
+         ' Start of escape sequence...
+
+         ' Terminate the previous span tag if one was started.
+         If spanTag <> "" Then
+            oStream.WriteText "</span>"
+         End If
+
+         ' The following pulled from "How to use Color" secion in Jezebel's INSTRUCT.DOC file:
+         ' =====================================================================
+         ' Renegade's colors....
+         ' You take a pipe, | (it's that thing above your \ key) and a number between
+         ' 01 and 15, MAKE SURE it's 2 digits, not |1, it has to be |01.. ;)
+         ' 01 is Blue 02 is green 03 is cyan 04 is red 05 is magenta 06 is brown
+         ' 07 is grey 08 lt black 09 lt blue 10 lt green 11 lt cyan 12 lt red
+         ' 13 lt magenta 14 yellow 15 white
+         ' |03This would be Cyan
+
+         Select Case Mid(ansiData, i + 1, 2)
+            Case "00"
+               fgColor = BLACK
+               fgIntensity = 0
+               blink = ""
+            Case "01"
+               fgColor = BLUE
+               fgIntensity = 0
+               blink = ""
+            Case "02"
+               fgColor = GREEN
+               fgIntensity = 0
+               blink = ""
+            Case "03"
+               fgColor = CYAN
+               fgIntensity = 0
+               blink = ""
+            Case "04"
+               fgColor = RED
+               fgIntensity = 0
+               blink = ""
+            Case "05"
+               fgColor = MAGENTA
+               fgIntensity = 0
+               blink = ""
+            Case "06"
+               fgColor = BROWN
+               fgIntensity = 0
+               blink = ""
+            Case "07"
+               fgColor = GRAY
+               fgIntensity = 0
+               blink = ""
+            Case "08"
+               fgColor = BLACK
+               fgIntensity = 1
+               blink = ""
+            Case "09"
+               fgColor = BLUE
+               fgIntensity = 1
+               blink = ""
+            Case "10"
+               fgColor = GREEN
+               fgIntensity = 1
+               blink = ""
+            Case "11"
+               fgColor = CYAN
+               fgIntensity = 1
+               blink = ""
+            Case "12"
+               fgColor = RED
+               fgIntensity = 1
+               blink = ""
+            Case "13"
+               fgColor = MAGENTA
+               fgIntensity = 1
+               blink = ""
+            Case "14"
+               fgColor = BROWN
+               fgIntensity = 1
+               blink = ""
+            Case "15"
+               fgColor = GRAY
+               fgIntensity = 1
+               blink = ""
+
+            Case "16"
+               bgColor = BLACK
+            Case "17"
+               bgColor = BLUE
+            Case "18"
+               bgColor = GREEN
+            Case "19"
+               bgColor = CYAN
+            Case "20"
+               bgColor = RED
+            Case "21"
+               bgColor = MAGENTA
+            Case "22"
+               bgColor = BROWN
+            Case "23"
+               bgColor = GRAY
+
+            Case "24"
+               fgColor = BLACK
+               fgIntensity = 1
+               blink = "class='blink' "
+            Case "25"
+               fgColor = BLUE
+               fgIntensity = 1
+               blink = "class='blink' "
+            Case "26"
+               fgColor = GREEN
+               fgIntensity = 1
+               blink = "class='blink' "
+            Case "27"
+               fgColor = CYAN
+               fgIntensity = 1
+               blink = "class='blink' "
+            Case "28"
+               fgColor = RED
+               fgIntensity = 1
+               blink = "class='blink' "
+            Case "29"
+               fgColor = MAGENTA
+               fgIntensity = 1
+               blink = "class='blink' "
+            Case "30"
+               fgColor = BROWN
+               fgIntensity = 1
+               blink = "class='blink' "
+            Case "31"
+               fgColor = GRAY
+               fgIntensity = 1
+               blink = "class='blink' "
+
+            ' Begin DARKNESS colors (added on 11/16/2020)
+            ' Just taking an informed stab on most of these.
+            Case "AL"
+               fgColor = RED
+               fgIntensity = 1
+               blink = ""
+            Case "DE" '
+               fgColor = BLACK
+               fgIntensity = 1
+               blink = ""
+            Case "DI" '
+               fgColor = BLACK
+               fgIntensity = 1
+               blink = ""
+            Case "DT" '
+               fgColor = GRAY
+               fgIntensity = 0
+               blink = ""
+            Case "LT" '
+               fgColor = GRAY
+               fgIntensity = 1
+               blink = ""
+            Case "H1"
+               fgColor = BROWN
+               fgIntensity = 1
+               blink = ""
+            Case "H2" '
+               fgColor = CYAN
+               fgIntensity = 0
+               blink = ""
+            Case "TI"
+               fgColor = GRAY
+               fgIntensity = 1
+               blink = ""
+            Case "IN"
+               fgColor = GREEN
+               fgIntensity = 1
+               blink = ""
+
+         End Select
+         ' Advance the parser.
+         i = i + 2
+
+         spanTag = "<span " & blink & "style='color:" & SetColorIntensity(fgColor, fgIntensity) & ";background-color:" & bgColor & ";'>"
+         oStream.WriteText spanTag
+
+      ElseIf charAtI = "~" And convertTildes Then
+         ' Start of escape sequence...
+
+         ' Terminate the previous span tag if one was started.
+         If spanTag <> "" Then
+            oStream.WriteText "</span>"
+         End If
+
+         ' The following pulled from "Special Control Codes" secion in SYSOP.DOC
+         ' of Death Masters:
+         ' =====================================================================
+         ' + Special Control Codes
+
+         '   There are MANY control codes in this file.  Most of them are forbidden to
+         '   you.  The only ones you can fool around with are:
+         '   ~1 Change text to GREEN until a new ~# sequence is found
+         '   ~2 Change text to BLUE until a new ~# sequence is found
+         '   ~3 Change text to CYAN until a new ~# sequence is found
+         '   ~4 Change text to RED until a new ~# sequence is found
+         '   ~5 Change text to MAGENTA until a new ~# sequence is found
+         '   ~6 Change text to BROWN until a new ~# sequence is found
+         '   ~7 Change text to LIGHT GREY until a new ~# sequence is found
+         '   ~8 Change text to DARK GREY until a new ~# sequence is found
+         '   ~9 Change text to BRIGHT BLUE until a new ~# sequence is found
+         '   ~a Change text to BRIGHT GREEN until a new ~# sequence is found
+         '   ~b Change text to BRIGHT CYAN until a new ~# sequence is found
+         '   ~c Change text to BRIGHT RED a new ~# sequence is found
+         '   ~d Change text to BRIGHT MAGENTA until a new ~# sequence is found
+         '   ~e Change text to YELLOW a new ~# sequence is found
+         '   ~f Change text to BRIGHT WHITE until a new ~# sequence is found
+
+         Select Case Mid(ansiData, i + 1, 1)
+            Case "1"
+               fgColor = GREEN
+               fgIntensity = 0
+            Case "2"
+               fgColor = BLUE
+               fgIntensity = 0
+            Case "3"
+               fgColor = CYAN
+               fgIntensity = 0
+            Case "4"
+               fgColor = RED
+               fgIntensity = 0
+            Case "5"
+               fgColor = MAGENTA
+               fgIntensity = 0
+            Case "6"
+               fgColor = BROWN
+               fgIntensity = 0
+            Case "7"
+               fgColor = GRAY
+               fgIntensity = 0
+            Case "8"
+               fgColor = BLACK
+               fgIntensity = 1
+            Case "9"
+               fgColor = BLUE
+               fgIntensity = 1
+            Case "a"
+               fgColor = GREEN
+               fgIntensity = 1
+            Case "b"
+               fgColor = CYAN
+               fgIntensity = 1
+            Case "c"
+               fgColor = RED
+               fgIntensity = 1
+            Case "d"
+               fgColor = MAGENTA
+               fgIntensity = 1
+            Case "e"
+               fgColor = BROWN
+               fgIntensity = 1
+            Case "f"
+               fgColor = GRAY
+               fgIntensity = 1
+         End Select
+         ' Advance the parser.
+         i = i + 1
+
+         spanTag = "<span " & blink & "style='color:" & SetColorIntensity(fgColor, fgIntensity) & ";background-color:" & bgColor & ";'>"
+         oStream.WriteText spanTag
+
+      ElseIf charAtI = "`" And convertLord Then
+         ' Start of escape sequence...
+
+         ' Terminate the previous span tag if one was started.
+         If spanTag <> "" Then
+            oStream.WriteText "</span>"
+         End If
+
+         ' The following pulled from "Screen Commands" secion in LADY.DOC:
+         ' =====================================================================
+         ' foreground color -
+         ' `1 dark blue     `6 brownish      `! light cyan     and seldom used
+         ' `2 dark green    `7 grey          `@ light red      `^ black
+         ' `3 dark cyan     `8 dark grey     `# light violet
+         ' `4 dark red      `9 light blue    `$ yellow
+         ' `5 dark violet   `0 light green   `% white
+
+         ' ** Note.. The black foreground here is only available here. Lady authors
+         ' are expected to use it wisely..
+
+         ' background color -
+         ' `r0 black               `r4 dark red
+         ' `r1 dark blue           `r5 dark violet
+         ' `r2 dark green          `r6 brownish
+         ' `r3 dark cyan           `r7 grey
+
+         Select Case Mid(ansiData, i + 1, 1)
+            Case "."
+               ' Apparently an undocumented reset.
+               fgIntensity = 0
+               bgColor = BLACK
+               fgColor = GRAY
+            Case "1"
+               fgColor = BLUE
+               fgIntensity = 0
+            Case "2"
+               fgColor = GREEN
+               fgIntensity = 0
+            Case "3"
+               fgColor = CYAN
+               fgIntensity = 0
+            Case "4"
+               fgColor = RED
+               fgIntensity = 0
+            Case "5"
+               fgColor = MAGENTA
+               fgIntensity = 0
+            Case "6"
+               fgColor = BROWN
+               fgIntensity = 0
+            Case "7"
+               fgColor = GRAY
+               fgIntensity = 0
+            Case "8"
+               fgColor = BLACK
+               fgIntensity = 1
+            Case "9"
+               fgColor = BLUE
+               fgIntensity = 1
+            Case "0"
+               fgColor = GREEN
+               fgIntensity = 1
+            Case "!"
+               fgColor = CYAN
+               fgIntensity = 1
+            Case "@"
+               fgColor = RED
+               fgIntensity = 1
+            Case "#"
+               fgColor = MAGENTA
+               fgIntensity = 1
+            Case "$"
+               fgColor = BROWN
+               fgIntensity = 1
+            Case "%"
+               fgColor = GRAY
+               fgIntensity = 1
+            Case "^"
+               fgColor = BLACK
+               fgIntensity = 0
+            Case "r"
+               ' Select the NEXT character for the background color.
+               Select Case Mid(ansiData, i + 2, 1)
+                  Case "0"
+                     bgColor = BLACK
+                  Case "1"
+                     bgColor = BLUE
+                  Case "2"
+                     bgColor = GREEN
+                  Case "3"
+                     bgColor = CYAN
+                  Case "4"
+                     bgColor = RED
+                  Case "5"
+                     bgColor = MAGENTA
+                  Case "6"
+                     bgColor = BROWN
+                  Case "7"
+                     bgColor = GRAY
+               End Select
+               ' Advance the parser again.
+               i = i + 1
+         End Select
+         ' Advance the parser.
+         i = i + 1
+
+         spanTag = "<span " & blink & "style='color:" & SetColorIntensity(fgColor, fgIntensity) & ";background-color:" & bgColor & ";'>"
+         oStream.WriteText spanTag
+
       ElseIf (charCode >= 1 And charCode <= 31) Or (charCode >= 127 And charCode <= 254) Then
          oStream.WriteText ToHtmlEntity(charCode)
          colPos = colPos + 1
@@ -292,9 +730,9 @@ If fso.FileExists(sourceFile) Then
       oStream.WriteText "</span>"
    End If
 
-   oStream.WriteText vbCrLf & "</pre><br/><br/><span style='color:" & DARKGRAY & ";background-color:" & BLACK & ";'>(updated at " & (fso.GetFile(sourceFile)).DateLastModified & ")</span>" & vbCrLf
-   oStream.WriteText vbCrlf & "</div>"
-   
+   oStream.WriteText vbCrLf & "</pre>"
+   oStream.WriteText vbCrlf & "</body>" & vbCrlf & "</html>"
+
    oStream.SaveToFile targetFile, 2
    oStream.Close
 
@@ -328,13 +766,11 @@ Function FlattenAnsi(ansiData)
    Dim colSav
    Dim newEscSeq
    Dim args
-   'Dim prevCol
-   'Dim prevRow
    Dim cBuf
    Dim rBuf
    Dim adding
    Dim a
-   
+
    ReDim screenBuffer(MAX_COLS, STARTING_ROWS)
    For rBuf = 0 To UBound(screenBuffer, 2)
       For cBuf = 0 To UBound(screenBuffer, 1)
@@ -346,10 +782,22 @@ Function FlattenAnsi(ansiData)
    col = 1
    newEscSeq = ""
 
+   'ansiData = Replace(ansiData, chr(0), "")
+
    For j = 1 To Len(ansiData)
-      charAtJ = Mid(ansiData, j, 1)
-      chrCode = Asc(charAtJ)
-      
+      'If Asc(Mid(ansiData, j, 1)) = 0 Then
+      '   charAtJ = " "
+      '   chrCode = 32
+      'Else
+         charAtJ = Mid(ansiData, j, 1)
+         chrCode = Asc(charAtJ)
+      'End If
+
+      'if charAtJ = chr(0) Then
+      '   wscript.echo "null replaced..."
+      '   charAtJ = " "
+      'end if
+
       If Mid(ansiData, j, 2) = CSI Then
 
          ' Locate the next alpha after this point
@@ -359,24 +807,25 @@ Function FlattenAnsi(ansiData)
          ' Advance the parser.
          j = j + Len(escSeq)
 
+            'Case "f" ' Cursor position, same as "H"
+            '   IF InStr(csiArgs, ";") > 0 Then
+            '      args = Split(csiArgs, ";")
+            '      row = CInt(args(0)) ' n
+            '      col = 1
+            '      If Ubound(args) > 0 Then
+            '         col = CInt(args(1)) ' m
+            '      End If
+            '   ElseIf csiArgs <> "" Then
+            '      row = CInt(csiArgs) ' n
+            '      col = 1
+            '   Else
+            '      row = 1
+            '      col = 1
+            '   End If
+
          Select Case csiLastByte
 
-            Case "H" ' Cursor position
-               IF InStr(csiArgs, ";") > 0 Then
-                  args = Split(csiArgs, ";")
-                  row = CInt(args(0)) ' n
-                  col = 1
-                  If Ubound(args) > 0 Then
-                     col = CInt(args(1)) ' m
-                  End If
-               ElseIf csiArgs <> "" Then
-                  row = CInt(csiArgs) ' n
-                  col = 1
-               Else
-                  row = 1
-                  col = 1
-               End If
-            Case "f" ' Cursor position, same as "H"
+            Case "H", "f" ' Cursor position
                IF InStr(csiArgs, ";") > 0 Then
                   args = Split(csiArgs, ";")
                   row = CInt(args(0)) ' n
@@ -404,7 +853,7 @@ Function FlattenAnsi(ansiData)
                End If
                row = row + CInt(csiArgs)
             Case "C"   ' Cursor Forward
-               ' Cancel the last SGR sequence before moving the "cursor", 
+               ' Cancel the last SGR sequence before moving the "cursor",
                ' otherwise it will drag the sequence with it, leading
                ' to an incorrect background and/or foreground color.
                if col <= MAX_COLS And row <= UBound(screenBuffer, 2) Then
@@ -412,7 +861,7 @@ Function FlattenAnsi(ansiData)
                End If
                newEscSeq = ""
                If csiArgs = "" Then
-                  csiArgs = 1 
+                  csiArgs = 1
                End If
                col = col + CInt(csiArgs)
             Case "D"   ' Cursor Backward
@@ -421,7 +870,7 @@ Function FlattenAnsi(ansiData)
                End If
                newEscSeq = ""
                If csiArgs = "" Then
-                  csiArgs = 1 
+                  csiArgs = 1
                End If
                col = col - CInt(csiArgs)
             Case "s"   ' Save cursor position
@@ -445,7 +894,7 @@ Function FlattenAnsi(ansiData)
             'Case "p"   ' Set keyboard strings (most likely won't be implemented)
             Case Else ' Store the escape sequence to travel with the next characters
                newEscSeq = newEscSeq & escSeq & csiLastByte
-               
+
          End Select
 
          If row < 1 Then
@@ -453,16 +902,14 @@ Function FlattenAnsi(ansiData)
          End If
          If col < 1 Then
             col = 1
-         End If         
+         End If
 
       Else
-      
-      ' Store the previous row and column before incrementing them. (not needed anymore?)
-         'prevRow = row  
-         'prevCol = col        
 
-         If chrCode = 13 Then       
-            if row <= UBound(screenBuffer, 2) then               
+         If chrCode = 13 Then
+            ignoreLF = True
+            if row <= UBound(screenBuffer, 2) then
+               'newEscSeq = CSI & "40m" & newEscSeq
                screenBuffer(col, row) = newEscSeq & screenBuffer(col, row)
             end if
             row = row + 1
@@ -472,14 +919,17 @@ Function FlattenAnsi(ansiData)
                   j = j + 1 ' Advance the parser past the LF.
                End If
             End If
-         ElseIf charCode = 10 Then  
-            if row <= UBound(screenBuffer, 2) then
-               screenBuffer(col, row) = newEscSeq & screenBuffer(col, row)
+         ElseIf chrCode = 10 Then
+            if ignoreLF = False then
+               if row <= UBound(screenBuffer, 2) then
+                  'newEscSeq = CSI & "40m" & newEscSeq
+                  screenBuffer(col, row) = newEscSeq & screenBuffer(col, row)
+               end if
+               row = row + 1
+               col = 1
             end if
-            row = row + 1
-            col = 1
          Else
-         
+
             ' Append a line if it goes beyond the current max.
             If row > UBound(screenBuffer, 2) Then
                adding = row - UBound(screenBuffer, 2)
@@ -492,28 +942,34 @@ Function FlattenAnsi(ansiData)
                   Next
                Next
             End If
-         
+
+            'If chrCode = 0 Then
+            '   charAtJ = " "
+            '   chrCode = 32
+            'End If
+            'wscript.echo "charAtJ: " & charAtI
+            'wscript.echo "chrCode: " & chrCode
             screenBuffer(col, row) = newEscSeq & charAtJ
-            
+
             ' Clear the newEscSeq after using it, don't need it again.
             If newEscSeq <> "" Then
                newEscSeq = ""
             End If
-            
+
             col = col + 1
-            
+
             ' Reached the end of the screen.
             If col > MAX_COLS Then
                col = 1
                row = row + 1
             End If
          End If
-      End If      
-      
+      End If
+
    Next
 
    ' Now form new ansiData out of the screen buffer contents.
-   For rBuf = 1 To UBound(screenBuffer, 2)
+   For rBuf = 0 To UBound(screenBuffer, 2)
       For cBuf = 1 To UBound(screenBuffer, 1)
          ' TODO - replace this with an ADO Stream object...
          '        No more concatenation.
@@ -586,9 +1042,9 @@ End Function
 
 '! Translates an ANSI character value from code page 437 to its modern HTML
 '! equivalent.
-'! 
-'! Could use an array for these instead, but with the huge gap between 31 
-'! and 127 there would be a lot of wasted elements. Probably not much 
+'!
+'! Could use an array for these instead, but with the huge gap between 31
+'! and 127 there would be a lot of wasted elements. Probably not much
 '! gained anyway.
 '!
 '! @param  ansiCharCode  The character to translate.
@@ -930,3 +1386,5 @@ Function ToHtmlEntity(ansiCharCode)
          ToHtmlEntity = "&#x25A0;" ' small block
    End Select
 End Function
+
+
