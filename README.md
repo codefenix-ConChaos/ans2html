@@ -43,10 +43,10 @@
 
 The "opts" can be any or all processing modes:
 
-  P: Pipe codes
-  T: Tilde codes
-  L: RTSoft "LoRD" codes
-  Y: Yankee Trader Galactic Newspaper bulletin prefixes
+ - P: Pipe codes
+ - T: Tilde codes
+ - L: RTSoft "LoRD" codes
+ - Y: Yankee Trader Galactic Newspaper bulletin prefixes
 
 You must specify a page title if using one of the optional processing modes.
 
