@@ -60,11 +60,7 @@ Probably goes without saying, but paths containing spaces must be wrapped
 in double-quotes.
   
 ## Example output:
-### Score bulletins
-  - [Legend of the Red Dragon Player Rankings](https://conchaos.synchro.net/doors/lord_bull.html) - Basic text with coloring.
-  - [Rockin Radio Top 10](https://conchaos.synchro.net/doors/rradio_bull.html) - Simple line and box drawing, converted from ANSI with many cursor movement sequences.
   - [Pick 7 Top 10](https://conchaos.synchro.net/doors/pick7_bull.html) - Blinking demo using `step-end`.
-### ANSI art
   - [TradeWars 2002 Cineplex](https://conchaos.synchro.net/doors/CINEPLEX.html) - Blinking demo using `linear`.
   - [TradeWars 2002 Derelict Spacecraft](https://conchaos.synchro.net/doors/ALN1.html) - Complex box and line drawing, converted from ANSI with many cursor movement sequences.
 
