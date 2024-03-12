@@ -58,11 +58,7 @@ Example:
 
 Probably goes without saying, but paths containing spaces must be wrapped
 in double-quotes.
-  
-## Example output:
-  - [Pick 7 Top 10](https://conchaos.synchro.net/doors/pick7_bull.html) - Blinking demo using `step-end`.
-  - [TradeWars 2002 Cineplex](https://conchaos.synchro.net/doors/CINEPLEX.html) - Blinking demo using `linear`.
-  - [TradeWars 2002 Derelict Spacecraft](https://conchaos.synchro.net/doors/ALN1.html) - Complex box and line drawing, converted from ANSI with many cursor movement sequences.
+
 
 # Enjoy!
  I hope people find this script useful.
